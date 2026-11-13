@@ -24,8 +24,9 @@ La app se llama `dibujayadivina` (<https://dibujayadivina.fly.dev>). Si el nombr
 ### Primer despliegue (una vez, a mano)
 
 1. Instala `flyctl` (en Windows: `winget install Fly-io.flyctl`) e inicia sesión: `fly auth login`.
-2. Confirma la región: `fly platform regions`. El archivo usa `scl` (Santiago); si no aparece en tu cuenta, cambia `primary_region` por `gru` (São Paulo) u otra cercana.
-3. Registra la app sin desplegar: `fly launch --no-deploy --copy-config`. Responde que no a bases de datos y a otros extras.
+   En Windows winget solo instala `flyctl` (no `fly`), y las terminales de VS Code no ven el PATH nuevo hasta reiniciar VS Code. Para seguir sin reiniciar: `$env:Path += ";$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Fly-io.flyctl_Microsoft.Winget.Source_8wekyb3d8bbwe"; Set-Alias fly flyctl`.
+2. Región: el archivo usa `gru` (São Paulo), porque Santiago (`scl`) no aparece en `fly platform regions`.
+3. Registra la app sin desplegar: `fly apps create dibujayadivina --org personal`.
 4. Despliega con una sola máquina: `fly deploy --ha=false`. Sin esa bandera Fly crea dos máquinas y las salas quedarían repartidas.
 5. Verifica: `fly status` debe mostrar una máquina y el chequeo en `passing`; abre <https://dibujayadivina.fly.dev>.
 
