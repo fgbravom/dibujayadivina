@@ -160,7 +160,10 @@ export function DrawingCanvas({
       },
       applyStrokePoints: (payload) => {
         const result = model.appendPoints(payload.id, payload.points);
-        if (result) {
+        if (result?.reopened) {
+          // El trazo se pintó cerrado (con su tramo final recto): se repinta todo con el trazo abierto.
+          repaint();
+        } else if (result) {
           withContext((ctx) => paintStrokeBody(ctx, result.stroke, result.previousCount));
         }
       },

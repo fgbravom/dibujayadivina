@@ -96,9 +96,32 @@ describe('StrokeModel', () => {
   it('tras load los trazos están cerrados, pero se pueden deshacer', () => {
     const model = new StrokeModel();
     model.load([stroke('a'), stroke('b')]);
-    expect(model.appendPoints('b', [1, 1])).toBeNull();
+    expect(model.appendPoints('a', [1, 1])).toBeNull();
     expect(model.undo()?.id).toBe('b');
     expect(model.strokes.map((s) => s.id)).toEqual(['a']);
+  });
+
+  it('tras load, el último trazo admite más puntos (quien entra a mitad de un trazo)', () => {
+    const model = new StrokeModel();
+    model.load([stroke('a', [0, 0, 1, 1]), stroke('b', [5, 5])]);
+    const result = model.appendPoints('b', [6, 6]);
+    expect(result?.previousCount).toBe(1);
+    expect(result?.reopened).toBe(true);
+    expect(model.appendPoints('b', [7, 7])?.reopened).toBe(false);
+    expect(model.strokes[1]?.points).toEqual([5, 5, 6, 6, 7, 7]);
+    expect(model.isOpen('b')).toBe(true);
+    expect(model.end('b')?.id).toBe('b');
+    expect(model.appendPoints('b', [7, 7])).toBeNull();
+  });
+
+  it('la reapertura tras load se pierde al empezar otro trazo o limpiar', () => {
+    const model = new StrokeModel();
+    model.load([stroke('a')]);
+    model.start(stroke('b'));
+    expect(model.appendPoints('a', [1, 1])).toBeNull();
+    model.load([stroke('c')]);
+    model.clear();
+    expect(model.appendPoints('c', [1, 1])).toBeNull();
   });
 
   it('una secuencia start/points/end como la de la red reconstruye el trazo', () => {

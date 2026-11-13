@@ -1,47 +1,91 @@
-import { useEffect, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
-import type { ClientToServerEvents, ServerToClientEvents } from '@dya/shared';
+import type { ReactNode } from 'react';
+import { GameEndScreen, HomeScreen, LobbyScreen } from './ui';
+import { actions } from './state/client';
+import { GameToast, ResumingScreen, TakenOverNotice } from './state/Notices';
+import { GameView } from './state/GameView';
+import { useGameStore } from './state/store';
 
-type DyaSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
-type Status = 'connecting' | 'connected' | 'disconnected';
+function confirmLeave(): void {
+  if (window.confirm('¿Quieres salir de la sala?')) actions.leaveRoom();
+}
 
-const STATUS_LABEL: Record<Status, string> = {
-  connecting: 'Conectando…',
-  connected: 'Conectado al servidor',
-  disconnected: 'Sin conexión con el servidor',
-};
-
-const STATUS_COLOR: Record<Status, string> = {
-  connecting: 'bg-amber-400',
-  connected: 'bg-emerald-500',
-  disconnected: 'bg-red-500',
-};
-
+/** Elige la pantalla según el estado de la sala (PLAN.md sección 2: LOBBY → CHOOSING → DRAWING → TURN_END → GAME_END). */
 export function App() {
-  const [status, setStatus] = useState<Status>('connecting');
+  const status = useGameStore((s) => s.status);
+  const takenOver = useGameStore((s) => s.takenOver);
+  const resuming = useGameStore((s) => s.resuming);
+  const busy = useGameStore((s) => s.busy);
+  const nickname = useGameStore((s) => s.nickname);
+  const inviteCode = useGameStore((s) => s.inviteCode);
+  const homeError = useGameStore((s) => s.homeError);
+  const roomError = useGameStore((s) => s.roomError);
+  const { room, feed, serverOffsetMs } = useGameStore((s) => s.session);
 
-  useEffect(() => {
-    const socket: DyaSocket = io();
-    socket.on('connect', () => setStatus('connected'));
-    socket.on('disconnect', () => setStatus('disconnected'));
-    socket.on('connect_error', () => setStatus('disconnected'));
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
+  // Mientras se abre el primer socket no se asusta con un aviso de conexión.
+  const connected = status !== 'disconnected' && !takenOver;
+
+  let screen: ReactNode;
+  if (!room) {
+    screen = resuming ? (
+      <ResumingScreen onCancel={actions.cancelResume} />
+    ) : (
+      <HomeScreen
+        initialName={nickname}
+        inviteCode={inviteCode}
+        error={homeError}
+        onDismissError={actions.dismissHomeError}
+        busy={busy}
+        connected={connected}
+        onCreateRoom={actions.createRoom}
+        onJoinRoom={actions.joinRoom}
+        onNameChange={actions.setNickname}
+      />
+    );
+  } else if (room.phase === 'LOBBY') {
+    screen = (
+      <LobbyScreen
+        room={room}
+        feed={feed}
+        connected={connected}
+        error={roomError}
+        onDismissError={actions.dismissRoomError}
+        onChangeSettings={actions.changeSettings}
+        onStart={actions.startGame}
+        onSendMessage={actions.sendMessage}
+        onLeave={confirmLeave}
+      />
+    );
+  } else if (room.phase === 'GAME_END') {
+    screen = (
+      <GameEndScreen
+        ranking={room.ranking ?? []}
+        selfId={room.selfId}
+        hostId={room.hostId}
+        connected={connected}
+        // "Jugar de nuevo" es `game:start`: el servidor devuelve la sala a la sala de espera.
+        onPlayAgain={actions.startGame}
+        onLeave={confirmLeave}
+      />
+    );
+  } else {
+    screen = (
+      <>
+        <GameView
+          room={room}
+          feed={feed}
+          connected={connected}
+          serverOffsetMs={serverOffsetMs}
+          onLeave={confirmLeave}
+        />
+        <GameToast error={roomError} onDismiss={actions.dismissRoomError} />
+      </>
+    );
+  }
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-4 p-4">
-      <h1 className="text-3xl font-bold">Dibuja y Adivina</h1>
-      <p
-        role="status"
-        data-testid="connection-status"
-        data-status={status}
-        className="flex items-center gap-2 text-sm"
-      >
-        <span className={`inline-block size-3 rounded-full ${STATUS_COLOR[status]}`} />
-        {STATUS_LABEL[status]}
-      </p>
-    </main>
+    <>
+      {screen}
+      {takenOver && <TakenOverNotice onResume={actions.resumeHere} />}
+    </>
   );
 }
