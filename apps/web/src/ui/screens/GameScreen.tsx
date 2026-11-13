@@ -221,7 +221,7 @@ export function GameScreen({
       data-testid="game-screen"
       data-phase={room.phase}
       onContextMenu={suppressLongPressMenu}
-      className="fixed inset-x-0 top-(--app-top) flex h-(--app-h) select-none flex-col overflow-hidden bg-paper pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]"
+      className="fixed inset-x-0 top-[calc(var(--app-top)+var(--notice-h,0px))] flex h-[calc(var(--app-h)-var(--notice-h,0px))] select-none flex-col overflow-hidden bg-paper pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]"
     >
       <ReconnectBanner connected={connected} />
       {/* Única voz de los cambios de turno para lectores de pantalla; los aciertos los anuncia la lista de mensajes. */}

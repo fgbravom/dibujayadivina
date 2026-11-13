@@ -1,5 +1,5 @@
-// Avisos que flotan sobre cualquier pantalla: sesión abierta en otra pestaña, volviendo a la sala
-// y errores de la sala durante la partida.
+// Avisos que flotan sobre cualquier pantalla: sesión abierta en otra pestaña, volviendo a la sala,
+// versión nueva del juego y errores de la sala durante la partida.
 
 import type { ErrorCode } from '@dya/shared';
 import { useEffect } from 'react';
@@ -75,6 +75,56 @@ export function GameToast({
       <div className="pointer-events-auto w-full max-w-md">
         <ErrorNotice error={error} onDismiss={onDismiss} />
       </div>
+    </div>
+  );
+}
+
+/** Alto de la franja del aviso de versión: las pantallas se corren lo mismo hacia abajo. */
+const UPDATE_NOTICE_HEIGHT = '2.75rem';
+
+/**
+ * Franja fija arriba con el aviso de versión nueva. No tapa nada: mientras está a la vista publica
+ * su alto en `--notice-h`, que la pantalla de partida resta de su espacio, y empuja el resto de las
+ * pantallas con el relleno superior de `<body>`.
+ */
+export function UpdateNotice({
+  onUpdate,
+  onDismiss,
+}: {
+  onUpdate: () => void;
+  onDismiss: () => void;
+}) {
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--notice-h', UPDATE_NOTICE_HEIGHT);
+    document.body.style.paddingTop = UPDATE_NOTICE_HEIGHT;
+    return () => {
+      root.style.removeProperty('--notice-h');
+      document.body.style.paddingTop = '';
+    };
+  }, []);
+  return (
+    <div
+      role="status"
+      data-testid="update-notice"
+      className="fixed inset-x-0 top-0 z-40 flex h-11 items-center gap-2 border-b-2 border-ink bg-card pr-1 pl-3 text-sm font-extrabold"
+    >
+      <span className="min-w-0 flex-1 truncate">Hay una versión nueva del juego</span>
+      <button
+        type="button"
+        onClick={onUpdate}
+        className="h-9 shrink-0 rounded-xl border-2 border-ink bg-copihue px-3 text-sm font-extrabold text-white hover:bg-copihue-dark"
+      >
+        Actualizar
+      </button>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Cerrar aviso de versión nueva"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-xl font-black leading-none hover:bg-paper-deep"
+      >
+        <span aria-hidden="true">×</span>
+      </button>
     </div>
   );
 }

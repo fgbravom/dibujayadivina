@@ -2,7 +2,7 @@
 // apodo y sala actual. Todo acceso al almacenamiento va con try/catch: en modo privado o con el
 // almacenamiento bloqueado puede lanzar, y el juego debe seguir funcionando sin él.
 
-import { sessionIdSchema } from '@dya/shared';
+import { ERROR_CODES, sessionIdSchema, type ErrorCode } from '@dya/shared';
 
 export type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -10,6 +10,8 @@ const KEYS = {
   sessionId: 'dya.sessionId',
   nickname: 'dya.nickname',
   room: 'dya.room',
+  reloadedFor: 'dya.reloadedFor',
+  pendingHomeError: 'dya.pendingHomeError',
 } as const;
 
 /** Sala a la que se pertenece: sirve para volver a entrar tras recargar la página. */
@@ -108,4 +110,26 @@ export function saveRoom(storage: KeyValueStorage | null, room: SavedRoom): void
 
 export function clearSavedRoom(storage: KeyValueStorage | null): void {
   remove(storage, KEYS.room);
+}
+
+/** Versión del cliente por la que ya se recargó la página sola: evita recargar en bucle por la misma. */
+export function loadReloadedVersion(storage: KeyValueStorage | null): string | null {
+  return read(storage, KEYS.reloadedFor);
+}
+
+export function saveReloadedVersion(storage: KeyValueStorage | null, version: string): void {
+  write(storage, KEYS.reloadedFor, version);
+}
+
+/** Error de la pantalla de inicio que debe sobrevivir a una recarga por actualización. */
+export function savePendingHomeError(storage: KeyValueStorage | null, error: ErrorCode): void {
+  write(storage, KEYS.pendingHomeError, error);
+}
+
+/** Lee y borra el error pendiente; ignora cualquier valor que no sea un código conocido. */
+export function takePendingHomeError(storage: KeyValueStorage | null): ErrorCode | null {
+  const raw = read(storage, KEYS.pendingHomeError);
+  if (raw === null) return null;
+  remove(storage, KEYS.pendingHomeError);
+  return (ERROR_CODES as readonly string[]).includes(raw) ? (raw as ErrorCode) : null;
 }

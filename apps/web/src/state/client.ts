@@ -24,12 +24,14 @@ import {
   loadSessionId,
   saveNickname,
   saveRoom,
+  takePendingHomeError,
   type SavedRoom,
 } from './identity';
 import { parseRoomPath } from './route';
 import { initialSession, reduceSession, type ServerEvent } from './session';
 import { startSoundDriver } from './soundDriver';
 import { useGameStore } from './store';
+import { checkForUpdate, reloadIfOutdated, reloadNow, startUpdateChecker } from './updater';
 
 type DyaSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -51,6 +53,8 @@ let ready = false;
 /** Hay un `room:join` de reconexión esperando su acuse. */
 let rejoining = false;
 let started = false;
+/** El socket se cayó y aún no volvió a conectar: la próxima conexión es una reconexión. */
+let wasDisconnected = false;
 
 const set = useGameStore.setState;
 
@@ -118,11 +122,17 @@ function connectSocket(): void {
   s.on('connect', () => {
     set({ status: 'connected', takenOver: false });
     if (joined) rejoin();
+    // Un despliegue siempre corta el socket: al volver es el momento de ver si hay versión nueva.
+    if (wasDisconnected) {
+      wasDisconnected = false;
+      void checkForUpdate();
+    }
   });
 
   s.on('disconnect', (reason) => {
     ready = false;
     rejoining = false;
+    wasDisconnected = true;
     set({ status: 'disconnected' });
     // El servidor cierra esta conexión cuando la misma sesión se abre en otra pestaña: no se
     // reconecta sola (se pelearían), la persona decide.
@@ -133,6 +143,7 @@ function connectSocket(): void {
   });
 
   s.on('connect_error', () => {
+    wasDisconnected = true;
     set({ status: 'disconnected' });
   });
 
@@ -180,6 +191,7 @@ function abandonRoom(error: ErrorCode | null): void {
     homeError: error,
     roomError: null,
   });
+  reloadIfOutdated();
 }
 
 function enterRoom(code: string, name: string): void {
@@ -244,6 +256,7 @@ function leaveRoom(options: { keepUrl?: boolean } = {}): void {
     roomError: null,
     session: initialSession,
   });
+  reloadIfOutdated();
 }
 
 /** Botón atrás/adelante del navegador. */
@@ -263,6 +276,12 @@ function onPopState(): void {
   }
 }
 
+/** Hay una sala en curso o a punto de estarlo: una recarga sola interrumpiría a la persona. */
+function inRoom(): boolean {
+  const { busy, session } = useGameStore.getState();
+  return joined !== null || session.room !== null || busy;
+}
+
 // --- Arranque ---------------------------------------------------------------
 
 /** Una sola vez, antes de pintar: lee identidad y URL, y abre el socket. */
@@ -272,7 +291,8 @@ export function initClient(): void {
 
   const inviteCode = parseRoomPath(window.location.pathname);
   const saved = loadSavedRoom(tab);
-  set({ nickname: loadNickname(local), inviteCode });
+  // Si la página se recargó por una versión nueva estando en el inicio, vuelve a mostrar su error.
+  set({ nickname: loadNickname(local), inviteCode, homeError: takePendingHomeError(tab) });
 
   // Recarga dentro de una sala: la URL sigue siendo la de esa sala. Cualquier otra ruta descarta lo guardado.
   if (saved && inviteCode === saved.code) {
@@ -284,6 +304,7 @@ export function initClient(): void {
 
   connectSocket();
   startSoundDriver();
+  startUpdateChecker(inRoom);
   window.addEventListener('popstate', onPopState);
 }
 
@@ -349,5 +370,13 @@ export const actions = {
   },
   dismissRoomError(): void {
     set({ roomError: null });
+  },
+  /** Cierra el aviso de versión nueva; vuelve a salir en la siguiente comprobación. */
+  dismissUpdate(): void {
+    set({ updateDismissed: true });
+  },
+  /** "Actualizar": recarga la página; la sala guardada devuelve a la persona a su sala. */
+  reloadForUpdate(): void {
+    reloadNow();
   },
 };

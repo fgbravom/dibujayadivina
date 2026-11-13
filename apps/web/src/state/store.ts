@@ -26,6 +26,10 @@ export type GameStore = {
   /** Último `system:error` relevante, para la sala. */
   roomError: ErrorCode | null;
   session: SessionState;
+  /** Versión del cliente publicada cuando difiere de la que corre; `null` si esta pestaña está al día. */
+  newVersion: string | null;
+  /** Se cerró el aviso de versión nueva (vuelve a salir en la siguiente comprobación). */
+  updateDismissed: boolean;
 };
 
 export const useGameStore = create<GameStore>()(() => ({
@@ -38,4 +42,6 @@ export const useGameStore = create<GameStore>()(() => ({
   homeError: null,
   roomError: null,
   session: initialSession,
+  newVersion: null,
+  updateDismissed: false,
 }));

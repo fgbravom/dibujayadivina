@@ -69,6 +69,18 @@ describe('HTTP', () => {
     expect((await get(server.port, '/assets/app.js', 'HEAD')).body).toBe('');
   });
 
+  it('index.html se revalida siempre y los assets con hash se cachean por un año', async () => {
+    const server = await startServer({ webDir });
+    // Una recarga normal no debe traer el HTML viejo tras un despliegue (el cliente compara su
+    // versión con la de este archivo).
+    for (const route of ['/', '/index.html', '/sala/ABCD']) {
+      const res = await get(server.port, route);
+      expect(res.headers['cache-control'], route).toBe('no-cache');
+    }
+    const js = await get(server.port, '/assets/app.js');
+    expect(js.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+  });
+
   it('un archivo que falta es 404 y no index.html', async () => {
     const server = await startServer({ webDir });
     expect((await get(server.port, '/assets/otro.js')).status).toBe(404);

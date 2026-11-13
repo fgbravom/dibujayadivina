@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { GameEndScreen, HomeScreen, LobbyScreen } from './ui';
 import { actions } from './state/client';
-import { GameToast, ResumingScreen, TakenOverNotice } from './state/Notices';
+import { GameToast, ResumingScreen, TakenOverNotice, UpdateNotice } from './state/Notices';
 import { GameView } from './state/GameView';
 import { useGameStore } from './state/store';
 
@@ -19,6 +19,8 @@ export function App() {
   const inviteCode = useGameStore((s) => s.inviteCode);
   const homeError = useGameStore((s) => s.homeError);
   const roomError = useGameStore((s) => s.roomError);
+  const newVersion = useGameStore((s) => s.newVersion);
+  const updateDismissed = useGameStore((s) => s.updateDismissed);
   const { room, feed, serverOffsetMs } = useGameStore((s) => s.session);
 
   // Mientras se abre el primer socket no se asusta con un aviso de conexión.
@@ -85,6 +87,9 @@ export function App() {
   return (
     <>
       {screen}
+      {room && newVersion !== null && !updateDismissed && (
+        <UpdateNotice onUpdate={actions.reloadForUpdate} onDismiss={actions.dismissUpdate} />
+      )}
       {takenOver && <TakenOverNotice onResume={actions.resumeHere} />}
     </>
   );
