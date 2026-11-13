@@ -3,3 +3,6 @@ dist
 pnpm-lock.yaml
 PLAN.md
 apps/server/src/words/words.json
+build
+test-results
+playwright-report

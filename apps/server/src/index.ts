@@ -16,6 +16,8 @@
 //   DYA_TURN_END_MS  pausa de fin de turno, en ms
 //   DYA_GRACE_MS     gracia de reconexión, en ms
 //   DYA_WORDS        palabras fijas separadas por coma (mínimo 3), p. ej. "huemul,cueca,micro"
+//   DYA_MAX_CONNECTIONS_PER_IP    tope de conexiones simultáneas por IP (las pruebas usan 127.0.0.1)
+//   DYA_MAX_ROOMS_PER_IP_PER_MINUTE  tope de salas creadas por IP cada minuto
 
 import { createGameServer } from './net/index.js';
 import type { GameServerOptions } from './net/index.js';
@@ -55,6 +57,10 @@ function readOptions(): GameServerOptions {
     if (drawMs !== undefined) options.drawMs = drawMs;
     if (turnEndMs !== undefined) options.turnEndMs = turnEndMs;
     if (graceMs !== undefined) options.graceMs = graceMs;
+    const maxConnections = intEnv('DYA_MAX_CONNECTIONS_PER_IP');
+    const maxRoomsPerMinute = intEnv('DYA_MAX_ROOMS_PER_IP_PER_MINUTE');
+    if (maxConnections !== undefined) options.maxConnectionsPerIp = maxConnections;
+    if (maxRoomsPerMinute !== undefined) options.maxRoomsPerIpPerMinute = maxRoomsPerMinute;
     const words = process.env.DYA_WORDS?.split(',')
       .map((w) => w.trim())
       .filter((w) => w !== '');
