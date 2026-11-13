@@ -11,7 +11,7 @@ Este documento es la fuente de verdad para los agentes. Cada tarea (T0…T11) es
 - Salas privadas por código o enlace, sin registro: solo se elige un apodo.
 - Partida completa con 3 jugadores simultáneos: elegir palabra, dibujar, adivinar, puntaje, rondas, ganador.
 - Funciona en desktop y móvil (táctil, vertical), en Chrome, Safari y Firefox actuales.
-- Banco de unas 300 palabras chilenas.
+- Banco de 500 palabras chilenas.
 - La sala admite hasta 12 jugadores desde el primer día. El MVP solo se *valida* con 3.
 
 **Fuera del MVP** (ver sección 9): salas públicas, cuentas, ranking, moderación, balde de pintura, varias instancias de servidor.
@@ -175,7 +175,7 @@ Cada tarea indica el tipo de agente sugerido, sus archivos y cómo se comprueba.
 
 **T2. Banco de palabras** · agente: `barrido` · archivos: `apps/server/src/words/**`
 
-- `words.json` con unas 300 entradas: `{ text, category, difficulty: 1|2|3, accept?: string[] }`.
+- `words.json` con 500 entradas: `{ text, category, difficulty: 1|2|3, accept?: string[] }`.
 - Categorías: comida (completo, sopaipilla, mote con huesillo), lugares (Torres del Paine, Valparaíso), animales y naturaleza (huemul, cóndor, copihue), cultura y fiestas (cueca, fonda, volantín), chilenismos y vida diaria (micro, guata, polera), y objetos comunes.
 - Criterio de inclusión: que se pueda dibujar. Sin insultos, sin personas reales, sin marcas.
 - `pickOptions(usadas, n)` entrega opciones sin repetir dentro de la partida y mezclando dificultades.

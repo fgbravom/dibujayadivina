@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { normalizeGuess } from '@dya/shared';
 import { isCorrectGuess, pickOptions, WORDS, type WordEntry } from './index.js';
 
-const CATEGORIES = ['comida', 'lugares', 'naturaleza', 'cultura', 'chilenismos', 'objetos'];
+const CATEGORIES = ['comida', 'lugares', 'naturaleza', 'cultura', 'chilenismos', 'objetos', 'personajes'];
 
 /** PRNG determinista (mulberry32) para pruebas reproducibles. */
 function seededRng(seed: number): () => number {
@@ -39,9 +39,20 @@ describe('WORDS', () => {
     }
   });
 
-  it('tiene las tres dificultades disponibles', () => {
+  it('tiene exactamente 500 palabras', () => {
+    expect(WORDS.length).toBe(500);
+  });
+
+  it('tiene las tres dificultades disponibles y al menos 150 de cada una', () => {
     const levels = new Set(WORDS.map((w) => w.difficulty));
     expect([...levels].sort()).toEqual([1, 2, 3]);
+    for (const d of [1, 2, 3]) {
+      expect(WORDS.filter((w) => w.difficulty === d).length).toBeGreaterThanOrEqual(150);
+    }
+  });
+
+  it('incluye la categoría personajes', () => {
+    expect(WORDS.some((w) => w.category === 'personajes')).toBe(true);
   });
 
   it('no tiene textos duplicados tras normalizar', () => {
@@ -104,6 +115,24 @@ describe('pickOptions', () => {
     expect(picked).toHaveLength(3);
     expect(new Set(picked.map((w) => w.text)).size).toBe(3);
     expect(picked.some((w) => used.has(w.text))).toBe(true);
+  });
+
+  it('recurre a palabras usadas solo de la dificultad agotada', () => {
+    // Agota todas las palabras frescas de dificultad 3; deja suficientes frescas de 1 y 2.
+    const fresh = [
+      ...WORDS.filter((w) => w.difficulty === 1).slice(0, 10),
+      ...WORDS.filter((w) => w.difficulty === 2).slice(0, 10),
+    ];
+    const used = allTextsExcept(fresh);
+    for (let seed = 1; seed <= 30; seed++) {
+      const picked = pickOptions(used, 3, seededRng(seed));
+      expect(picked).toHaveLength(3);
+      expect(picked.map((w) => w.difficulty).sort()).toEqual([1, 2, 3]);
+      // Las de dificultad 1 y 2 deben ser frescas; la 3 es una usada de ese nivel.
+      expect(used.has(picked.find((w) => w.difficulty === 1)!.text)).toBe(false);
+      expect(used.has(picked.find((w) => w.difficulty === 2)!.text)).toBe(false);
+      expect(used.has(picked.find((w) => w.difficulty === 3)!.text)).toBe(true);
+    }
   });
 
   it('mezcla dificultades: con n=3 trae una de cada nivel', () => {

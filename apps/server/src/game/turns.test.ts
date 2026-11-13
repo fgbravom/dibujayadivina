@@ -496,6 +496,28 @@ describe('fin de partida', () => {
     expect(h.dispatch({ type: 'start', playerId: 'p2' }).error).toBeUndefined();
     expect(h.state.phase).toBe('LOBBY');
   });
+
+  it('conserva usedWords entre partidas sucesivas de la misma sala', () => {
+    const h = startedGame(['Ana', 'Beto'], { settings: { rounds: 1 } });
+    playToEnd(h);
+    const previousUsed = [...h.state.usedWords];
+    expect(previousUsed.length).toBeGreaterThan(0);
+
+    // Volver al lobby y empezar una segunda partida.
+    expect(h.dispatch({ type: 'start', playerId: 'p1' }).error).toBeUndefined();
+    expect(h.state.phase).toBe('LOBBY');
+    expect(h.dispatch({ type: 'start', playerId: 'p1' }).error).toBeUndefined();
+    expect(h.state.phase).toBe('CHOOSING');
+
+    // Las palabras de la partida anterior se conservan y las nuevas opciones no se repiten.
+    for (const word of previousUsed) {
+      expect(h.state.usedWords).toContain(word);
+    }
+    const newOptions = h.state.turn?.options.map((o) => o.text) ?? [];
+    for (const word of newOptions) {
+      expect(previousUsed).not.toContain(word);
+    }
+  });
 });
 
 describe('estado acotado', () => {

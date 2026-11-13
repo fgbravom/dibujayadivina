@@ -4,7 +4,7 @@ import { normalizeGuess } from '@dya/shared';
 import rawWords from './words.json' with { type: 'json' };
 
 export type WordCategory =
-  'comida' | 'lugares' | 'naturaleza' | 'cultura' | 'chilenismos' | 'objetos';
+  'comida' | 'lugares' | 'naturaleza' | 'cultura' | 'chilenismos' | 'objetos' | 'personajes';
 export type WordDifficulty = 1 | 2 | 3;
 
 export interface WordEntry {
@@ -33,7 +33,8 @@ function shuffle<T>(items: readonly T[], rng: () => number): T[] {
 
 /**
  * Elige `n` palabras distintas para ofrecer como opciones. Evita las de `used` mientras haya
- * suficientes; si no, usa todo el banco. Intenta una palabra de cada dificultad antes de repetir nivel.
+ * suficientes; si una dificultad se agota, recurre a las usadas de ese nivel. Intenta una palabra
+ * de cada dificultad antes de repetir nivel.
  */
 export function pickOptions(used: ReadonlySet<string>, n: number, rng: () => number): WordEntry[] {
   if (n > WORDS.length) {
@@ -43,16 +44,12 @@ export function pickOptions(used: ReadonlySet<string>, n: number, rng: () => num
   const fresh = WORDS.filter((w) => !used.has(w.text));
   const pool = fresh.length >= n ? fresh : WORDS;
 
-  const queues = new Map(
+  const freshQueues = new Map(
+    DIFFICULTIES.map((d) => [d, shuffle(fresh.filter((w) => w.difficulty === d), rng)] as const),
+  );
+  const usedQueues = new Map(
     DIFFICULTIES.map(
-      (d) =>
-        [
-          d,
-          shuffle(
-            pool.filter((w) => w.difficulty === d),
-            rng,
-          ),
-        ] as const,
+      (d) => [d, shuffle(WORDS.filter((w) => w.difficulty === d && used.has(w.text)), rng)] as const,
     ),
   );
   const order = shuffle(DIFFICULTIES, rng);
@@ -60,13 +57,17 @@ export function pickOptions(used: ReadonlySet<string>, n: number, rng: () => num
   const picked: WordEntry[] = [];
   const seen = new Set<string>();
 
+  function nextFromDifficulty(d: WordDifficulty): WordEntry | undefined {
+    return freshQueues.get(d)?.shift() ?? usedQueues.get(d)?.shift();
+  }
+
   // Rondas por dificultad: en cada vuelta toma una palabra de cada nivel, en orden aleatorio.
   let took = true;
   while (picked.length < n && took) {
     took = false;
     for (const d of order) {
       if (picked.length === n) break;
-      const entry = queues.get(d)?.shift();
+      const entry = nextFromDifficulty(d);
       if (entry === undefined) continue;
       took = true;
       if (!seen.has(entry.text)) {
@@ -76,7 +77,7 @@ export function pickOptions(used: ReadonlySet<string>, n: number, rng: () => num
     }
   }
 
-  // Si falta algún nivel, completa con el resto del banco.
+  // Si falta, completa con el resto del banco.
   for (const entry of shuffle(pool, rng)) {
     if (picked.length === n) break;
     if (!seen.has(entry.text)) {

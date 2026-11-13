@@ -185,7 +185,6 @@ function handleStart(env: Env, playerId: PlayerId): Outcome {
     }
   }
   s.round = 1;
-  s.usedWords = [];
   s.drawnThisRound = [];
   startNextTurn(env);
   return {};
