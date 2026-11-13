@@ -19,12 +19,29 @@ Abre <http://localhost:8080>. Comprobaciones rápidas: `curl localhost:8080/heal
 
 ## Fly.io
 
-1. Instala `flyctl` e inicia sesión: `fly auth login`.
-2. Edita `fly.toml`: reemplaza `app` por un nombre único (será `<app>.fly.dev`).
-3. Confirma la región: `fly platform regions`. El archivo usa `scl` (Santiago); si no aparece en tu cuenta, cambia `primary_region` por `gru` (São Paulo) u otra cercana.
-4. Registra la app sin desplegar: `fly launch --no-deploy --copy-config`. Responde que no a bases de datos y a otros extras.
-5. Despliega con una sola máquina: `fly deploy --ha=false`. Sin esa bandera Fly crea dos máquinas y las salas quedarían repartidas.
-6. Verifica: `fly status` debe mostrar una máquina y el chequeo en `passing`; abre `https://<app>.fly.dev`.
+La app se llama `dibujayadivina` (<https://dibujayadivina.fly.dev>). Si el nombre se cambia, hay que cambiarlo en `fly.toml`.
+
+### Primer despliegue (una vez, a mano)
+
+1. Instala `flyctl` (en Windows: `winget install Fly-io.flyctl`) e inicia sesión: `fly auth login`.
+2. Confirma la región: `fly platform regions`. El archivo usa `scl` (Santiago); si no aparece en tu cuenta, cambia `primary_region` por `gru` (São Paulo) u otra cercana.
+3. Registra la app sin desplegar: `fly launch --no-deploy --copy-config`. Responde que no a bases de datos y a otros extras.
+4. Despliega con una sola máquina: `fly deploy --ha=false`. Sin esa bandera Fly crea dos máquinas y las salas quedarían repartidas.
+5. Verifica: `fly status` debe mostrar una máquina y el chequeo en `passing`; abre <https://dibujayadivina.fly.dev>.
+
+### Despliegue continuo con GitHub Actions
+
+`.github/workflows/fly-deploy.yml` corre formato, lint, typecheck y pruebas en cada push a `main` y, si pasan, despliega con `flyctl deploy --remote-only --ha=false` (la imagen se construye en Fly, no en GitHub). También se puede lanzar a mano desde la pestaña Actions.
+
+Para activarlo, crea un token de despliegue limitado a esta app y guárdalo como secreto del repositorio:
+
+```sh
+fly tokens create deploy -x 999999h
+```
+
+En GitHub: _Settings → Secrets and variables → Actions → New repository secret_, con nombre `FLY_API_TOKEN` y el token completo (incluido el prefijo `FlyV1`) como valor. Sin el secreto, el paso de despliegue falla.
+
+Ojo: como cada push a `main` despliega, también corta las partidas en curso (ver la advertencia al final).
 
 Compromiso de costo: `fly.toml` usa `auto_stop_machines = "off"`, por lo que la máquina queda encendida siempre y no pierde salas. Con `"stop"` Fly la apaga sin tráfico (más barato) a costa de perder las salas vacías y de un arranque en frío para el primer visitante.
 
