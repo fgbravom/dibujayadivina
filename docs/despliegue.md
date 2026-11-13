@@ -52,13 +52,17 @@ Sirven igual: crea un servicio web desde este repositorio con el `Dockerfile`, u
 
 ## Variables de entorno
 
-| Variable        | Por defecto en la imagen | Uso                                                                  |
-| --------------- | ------------------------ | -------------------------------------------------------------------- |
-| `PORT`          | `8080`                   | Puerto de escucha. Debe coincidir con `internal_port` de `fly.toml`. |
-| `HOST`          | `0.0.0.0`                | Interfaz de escucha.                                                 |
-| `WEB_DIR`       | `/app/web`               | Carpeta del cliente compilado.                                       |
-| `NODE_ENV`      | `production`             |                                                                      |
-| `DYA_MAX_ROOMS` | `500` (del servidor)     | Tope de salas simultáneas; opcional.                                 |
+| Variable           | Por defecto en la imagen | Uso                                                                                                                                                                                                                                              |
+| ------------------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PORT`             | `8080`                   | Puerto de escucha. Debe coincidir con `internal_port` de `fly.toml`.                                                                                                                                                                             |
+| `HOST`             | `0.0.0.0`                | Interfaz de escucha.                                                                                                                                                                                                                             |
+| `WEB_DIR`          | `/app/web`               | Carpeta del cliente compilado.                                                                                                                                                                                                                   |
+| `NODE_ENV`         | `production`             | Con `production` el servidor rechaza las conexiones Socket.IO cuyo `Origin` no coincide con el `Host` (ver `ALLOWED_ORIGINS`). Fuera de producción no filtra.                                                                                    |
+| `DYA_MAX_ROOMS`    | `500` (del servidor)     | Tope de salas simultáneas; opcional.                                                                                                                                                                                                             |
+| `CLIENT_IP_HEADER` | (sin definir)            | Cabecera con la IP real del cliente cuando hay un proxy delante. Con ella el servidor cuenta conexiones y salas por IP; sin ella no confía en ninguna cabecera y usa la IP de la conexión. **En Fly conviene `CLIENT_IP_HEADER=fly-client-ip`.** |
+| `ALLOWED_ORIGINS`  | (sin definir)            | Orígenes completos permitidos además del propio host, separados por comas (p. ej. `https://juego.example.com,https://www.juego.example.com`). Solo aplica con `NODE_ENV=production`. Las conexiones sin `Origin` siempre se aceptan.             |
+
+Topes de abuso del servidor (no configurables por entorno): por IP, 40 conexiones simultáneas y 10 salas creadas por minuto (`room:create` responde `rate_limited`); una sala en LOBBY o GAME_END sin acciones de jugadores durante 30 minutos se cierra y avisa a sus sockets con `room_not_found`. Si el servidor está detrás de un proxy y no se define `CLIENT_IP_HEADER`, todos los visitantes parecen venir de la misma IP y comparten esos topes.
 
 Las variables `DYA_*` de modo de pruebas (`DYA_TEST`, `DYA_DRAW_MS`, etc.) no deben fijarse en producción.
 

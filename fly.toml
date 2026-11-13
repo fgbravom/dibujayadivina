@@ -14,6 +14,8 @@ primary_region = "gru"
 [env]
   # PORT debe coincidir con internal_port; HOST, NODE_ENV y WEB_DIR ya vienen en la imagen.
   PORT = "8080"
+  # Fly añade la IP real del cliente en esta cabecera; el servidor la usa para los topes por IP.
+  CLIENT_IP_HEADER = "fly-client-ip"
 
 [http_service]
   internal_port = 8080

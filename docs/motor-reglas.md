@@ -84,6 +84,7 @@ export interface TurnState {
   revealed: number[]; // índices revelados, según getMaskableIndices
   pendingHints: number[]; // instantes absolutos ascendentes, todos < deadline
   guesses: Guess[];
+  presentIds: PlayerId[]; // jugadores presentes al empezar a dibujar; solo sus aciertos puntúan al dibujante
   result: TurnEnd | null; // tipo TurnEnd de @dya/shared; se fija al entrar en TURN_END
 }
 
@@ -95,7 +96,7 @@ export interface GameState {
   hostId: PlayerId | null;
   round: number; // 0 en LOBBY
   drawnThisRound: PlayerId[];
-  usedWords: string[]; // textos de todas las opciones ofrecidas en la partida
+  usedWords: string[]; // textos de las opciones ofrecidas en la partida; se vacía al superar 600
   turn: TurnState | null; // solo en CHOOSING, DRAWING y TURN_END
   deadline: number | null; // fin de CHOOSING, DRAWING o TURN_END; null en LOBBY y GAME_END
   ranking: RankingEntry[] | null; // solo en GAME_END
@@ -205,14 +206,14 @@ Consecuencia: un intento o un `chooseWord` que llega después de su plazo se eva
 
 1. Candidato: el primer jugador, en orden de llegada, conectado y que no esté en `drawnThisRound`.
 2. Si no hay: si `round < settings.rounds`, `round++`, se vacía `drawnThisRound` y se reintenta una vez. Si sigue sin haber, o era la última ronda, `endGame`.
-3. `options = pickWords(usedWords, optionsCount)` (vacío lanza error); sus textos se agregan a `usedWords`; el candidato se agrega a `drawnThisRound`; fase CHOOSING con `deadline = now + chooseMs`.
+3. Si `usedWords` tiene más de 600 entradas, se vacía (la lista no crece sin límite; a cambio, tras la purga una palabra puede repetirse). `options = pickWords(usedWords, optionsCount)` (vacío lanza error); sus textos se agregan a `usedWords`; el candidato se agrega a `drawnThisRound`; fase CHOOSING con `deadline = now + chooseMs`.
 4. Efectos: `strokes:reset`; `turn:choosing { drawerId, endsAt }` a la sala; `turn:options { words }` al dibujante.
 
-**`beginDrawing(entry)`**: fija `word`, `answers`, `pendingHints`; fase DRAWING con `deadline = now + drawMs`. Efectos: `turn:start` a la sala; `turn:word` al dibujante.
+**`beginDrawing(entry)`**: fija `word`, `answers`, `pendingHints` y `presentIds` (los ids de todos los jugadores de la sala en ese instante); fase DRAWING con `deadline = now + drawMs`. Efectos: `turn:start` a la sala; `turn:word` al dibujante.
 
 **`endTurn(reason)`**: calcula ganancias (todo 0 si `drawerLeft`), suma puntajes a los jugadores presentes, fase TURN_END con `deadline = now + turnEndMs`. Efecto: `turn:end` a la sala, con ganancias y puntajes de todos los presentes.
 
-**`endGame`**: `turn = null`, fase GAME_END, `deadline = null`, `ranking` calculado. Efecto: `game:end { ranking }`.
+**`endGame`**: `turn = null`, fase GAME_END, `deadline = null`, `ranking` calculado. Efectos: `strokes:reset` (la red libera el historial de trazos del último turno) y `game:end { ranking }`.
 
 **`toLobby`**: fase LOBBY, `round = 0`, `turn = null`, `deadline = null`, `ranking = null`. Los puntajes se conservan hasta el próximo inicio. Efectos: `strokes:reset` y `snapshot` a cada conectado.
 
@@ -220,7 +221,7 @@ Consecuencia: un intento o un `chooseWord` que llega después de su plazo se eva
 
 **`removePlayer(id)`**
 
-1. Lo quita y emite `player:left`.
+1. Lo quita (también de `drawnThisRound`) y emite `player:left`.
 2. Si era anfitrión, el rol pasa al conectado más antiguo (si no hay, al más antiguo) y se emite `player:updated` del nuevo.
 3. Si la fase es CHOOSING, DRAWING o TURN_END y quedan menos de `minPlayers` jugadores (contando los que están en gracia): `toLobby` y termina.
 4. Si era el dibujante: en CHOOSING, `startNextTurn`; en DRAWING, `endTurn('drawerLeft')`. Si era adivinador en DRAWING: `checkAllGuessed`.
@@ -247,14 +248,14 @@ El texto del mensaje llega ya saneado por la red; si queda vacío tras `trim`, n
 
 1. Lo envía el dibujante o quien ya acertó: `message:new` canal `guessed` a `players([dibujante, ...quienes acertaron])`. No se evalúa.
 2. `n = normalizeGuess(text)`. Si `n` está en `answers`: es acierto. Se registra con `guesserPoints(posición)`; se emite `guess:correct { playerId }` a la sala y `turn:word { word }` a quien acertó; luego `checkAllGuessed`; si el turno sigue y fue el primer acierto, se acorta el tiempo. El texto nunca se emite.
-3. El mensaje contiene una respuesta como palabras completas (`"es la micro?"`): `message:new` canal `all` solo a su autor, para no filtrarla.
-4. Distancia de edición 1 a alguna respuesta: `message:new` a la sala y luego `guess:close` al autor.
+3. El mensaje contiene una respuesta: `message:new` canal `all` solo a su autor, para no filtrarla. Contiene es, para alguna respuesta, que aparezca como palabras completas (`"es la micro?"`) o, si la respuesta normalizada tiene 4 o más caracteres, como subcadena del intento normalizado (`"microondas"`), comparando también ambos sin espacios (`"mi cro"`). Con respuestas de menos de 4 caracteres solo rige la regla de palabras completas, para no ocultar mensajes inocentes.
+4. Distancia de edición 1 a alguna respuesta: `message:new` canal `all` solo a su autor y luego `guess:close` al autor. El texto no va a la sala porque puede ser la palabra con una letra de más o de menos.
 5. Resto: `message:new` canal `all` a la sala.
 
 ## 7. Puntaje, ranking y nombres
 
 - Adivinadores: `GUESSER_SCORES[i]`, y el último valor para los siguientes.
-- Dibujante: 0 sin aciertos; si no, `DRAWER_FIRST_GUESS_SCORE + DRAWER_EXTRA_GUESS_SCORE * (n - 1)`. `n` cuenta también a quien acertó y se fue.
+- Dibujante: 0 sin aciertos; si no, `DRAWER_FIRST_GUESS_SCORE + DRAWER_EXTRA_GUESS_SCORE * (n - 1)`. `n` cuenta también a quien acertó y se fue, pero no a quien entró a la sala después de empezar a dibujar (no está en `presentIds`): esos aciertos puntúan para quien acierta y cuentan para `checkAllGuessed`, no para el dibujante.
 - Los puntajes se suman al terminar el turno. No hay `player:updated` de puntaje durante el turno; llega en `turn:end`.
 - Ranking: puntaje descendente; en empate, orden de llegada. `rank = 1 + jugadores con puntaje estrictamente mayor` (1, 1, 3).
 - `uniqueName`: compara con `normalizeGuess`; si se repite agrega ` 2`, ` 3`…, recortando la base para no pasar el largo máximo.
@@ -283,6 +284,7 @@ El texto del mensaje llega ya saneado por la red; si queda vacío tras `trim`, n
 
 - `canDraw` como guarda de `stroke:*`, `canvas:undo` y `canvas:clear`.
 - El historial de trazos vive en la red, no en el motor: son hasta 30 mensajes por segundo y no deciden ninguna regla. El efecto `strokes:reset` indica cuándo vaciarlo.
+- `buildSnapshot` incluye `word` en DRAWING para el dibujante y para quien ya acertó en el turno (al reconectarse recupera la palabra); para los demás es `null`.
 - El efecto `snapshot`, al que la red agrega `code` y `strokes` antes de emitir `room:state`.
 - `nextWakeAt` para el temporizador único de la sala.
 
@@ -298,13 +300,13 @@ Arnés (`testing.ts`): `now` controlable, `rng` de secuencia fija, `newId` incre
 
 **Dibujo y pistas.** `turn:start` con máscara y `turn:word` solo al dibujante; pistas al 50 % y 75 %; palabra de 3 a 5 letras tiene una pista; de 2 letras, ninguna; no revelan espacios ni se repiten; `nextWakeAt` es el mínimo entre plazo, pista y gracia.
 
-**Intentos.** Acierto con tildes y mayúsculas distintas; con alternativa aceptada; `ano` no acierta `año`; el acierto no emite texto y sí `guess:correct`; quien acierta recibe `turn:word`; distancia 1 emite `guess:close` solo al autor; distancia 2 no; mensaje que contiene la palabra solo llega a su autor; dibujante y quien ya acertó van al canal `guessed`; mensaje vacío no emite; fuera de DRAWING es chat a todos.
+**Intentos.** Acierto con tildes y mayúsculas distintas; con alternativa aceptada; `ano` no acierta `año`; el acierto no emite texto y sí `guess:correct`; quien acierta recibe `turn:word`; distancia 1 emite el texto y `guess:close` solo al autor; distancia 2 no; mensaje que contiene la palabra (por palabras completas o, desde 4 caracteres, como subcadena o sin espacios) solo llega a su autor; dibujante y quien ya acertó van al canal `guessed`; mensaje vacío no emite; fuera de DRAWING es chat a todos.
 
 **Tiempo.** Primer acierto acorta a 20 s si quedaba más; no alarga si quedaba menos; el segundo no acorta; acortar descarta pistas fuera de plazo; intento tras el plazo es chat de TURN_END.
 
 **Puntaje.** 10, 8, 6, 4, 4; dibujante 10 más 1 por acierto extra; 0 sin aciertos; `drawerLeft` anula el turno; las ganancias de quien se fue se descartan pero su acierto cuenta para el dibujante; se suma recién en TURN_END.
 
-**Fin de turno.** Por tiempo; todos acertaron; un adivinador desconectado no bloquea; dibujante se desconecta en DRAWING; en CHOOSING se salta sin `turn:end`; TURN_END dura 5 s y el turno siguiente emite `strokes:reset`.
+**Fin de turno.** Por tiempo; todos acertaron; un adivinador desconectado no bloquea; dibujante se desconecta en DRAWING; en CHOOSING se salta sin `turn:end`; TURN_END dura 5 s y el turno siguiente emite `strokes:reset`; `endGame` también lo emite; aciertos de quien entró tarde no suman al dibujante; `usedWords` se vacía al superar 600; borrar un jugador lo quita de `drawnThisRound`.
 
 **Rondas.** Cada uno dibuja una vez por ronda en orden de llegada; el desconectado se salta y dibuja si vuelve a tiempo; quien entra tarde dibuja al final de la ronda y puede acertar en el turno en curso; tras la última ronda, TURN_END y luego GAME_END.
 
@@ -312,6 +314,6 @@ Arnés (`testing.ts`): `now` controlable, `rng` de secuencia fija, `newId` incre
 
 **Fin de partida.** `game:end` ordenado; empates comparten `rank`; GAME_END no vence solo; `start` en GAME_END lleva a LOBBY conservando puntajes; `start` de quien no es anfitrión da `not_host`.
 
-**Fugas y snapshot.** La palabra no llega a un adivinador en ninguna fase de una partida completa; snapshot de adivinador sin palabra ni opciones; snapshot del dibujante en CHOOSING con opciones y en DRAWING con palabra; `canDraw` solo para el dibujante en DRAWING.
+**Fugas y snapshot.** La palabra no llega a un adivinador en ninguna fase de una partida completa; snapshot de adivinador sin palabra ni opciones; snapshot del dibujante en CHOOSING con opciones y en DRAWING con palabra; snapshot de quien ya acertó con la palabra; `canDraw` solo para el dibujante en DRAWING.
 
 **Integral.** Partida de 3 jugadores y 3 rondas con secuencia de fases y puntajes finales exactos.
