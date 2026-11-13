@@ -32,6 +32,18 @@ describe('snapshot', () => {
     expect(JSON.stringify({ ...drawing, mask: null })).not.toContain('huemul');
   });
 
+  it('quien ya acertó recupera la palabra al reconectarse; quien no, no', () => {
+    const h = drawingGame(['Ana', 'Beto', 'Caro', 'Dani']);
+    h.say('p2', 'huemul');
+    expect(h.state.phase).toBe('DRAWING');
+    expect(buildSnapshot(h.state, 'p2', h.now).word).toBe('huemul');
+    expect(buildSnapshot(h.state, 'p3', h.now).word).toBeNull();
+    expect(buildSnapshot(h.state, 'p1', h.now).word).toBe('huemul');
+    // Tras el turno vuelve a null para todos.
+    h.advanceTo(h.state.deadline!);
+    expect(buildSnapshot(h.state, 'p2', h.now).word).toBeNull();
+  });
+
   it('el dibujante ve las opciones en CHOOSING y la palabra en DRAWING', () => {
     const h = startedGame(['Ana', 'Beto']);
     const choosing = buildSnapshot(h.state, 'p1', h.now);

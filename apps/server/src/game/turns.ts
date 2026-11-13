@@ -21,6 +21,9 @@ function hintTimes(env: Env, word: string, start: number, totalMs: number): numb
   return hintFractions.slice(0, count).map((f) => start + Math.floor(totalMs * f));
 }
 
+/** Tope de `usedWords`: al superarlo se vacía para que la lista no crezca sin límite. */
+export const MAX_USED_WORDS = 600;
+
 export function startNextTurn(env: Env): void {
   const s = env.state;
   const pick = (drawn: readonly PlayerId[]) =>
@@ -39,6 +42,7 @@ export function startNextTurn(env: Env): void {
     return;
   }
 
+  if (s.usedWords.length > MAX_USED_WORDS) s.usedWords = [];
   const options = env.ctx.pickWords(s.usedWords, s.config.optionsCount);
   if (options.length === 0) throw new Error('pickWords no devolvió opciones');
   s.usedWords.push(...options.map((o) => o.text));
@@ -51,6 +55,7 @@ export function startNextTurn(env: Env): void {
     revealed: [],
     pendingHints: [],
     guesses: [],
+    presentIds: [],
     result: null,
   };
   s.phase = 'CHOOSING';
@@ -70,6 +75,7 @@ export function beginDrawing(env: Env, entry: WordEntry): void {
 
   const answers = [entry.text, ...(entry.accept ?? [])].map(normalizeGuess).filter((a) => a !== '');
   turn.word = entry;
+  turn.presentIds = s.players.map((p) => p.id);
   turn.answers = [...new Set(answers)];
   turn.revealed = [];
   turn.pendingHints = hintTimes(env, entry.text, now, total);
@@ -122,6 +128,7 @@ export function endGame(env: Env): void {
   s.phase = 'GAME_END';
   s.deadline = null;
   s.ranking = ranking(s.players);
+  env.fx.push({ type: 'strokes:reset' });
   emit(env, toRoom, 'game:end', { ranking: s.ranking });
 }
 

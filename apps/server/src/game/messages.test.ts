@@ -10,9 +10,33 @@ describe('classifyGuess', () => {
     expect(classifyGuess('micro', answers)).toBe('correct');
     expect(classifyGuess('la micro', answers)).toBe('correct');
     expect(classifyGuess('es la micro', answers)).toBe('contains');
-    expect(classifyGuess('micros', answers)).toBe('close');
-    expect(classifyGuess('microondas', answers)).toBe('plain');
+    expect(classifyGuess('micra', answers)).toBe('close');
+    expect(classifyGuess('minero', answers)).toBe('plain');
     expect(classifyGuess('', answers)).toBe('plain');
+  });
+
+  it('una respuesta de 4 o más caracteres contenida como subcadena cuenta como contains', () => {
+    const answers = ['micro', 'la micro'];
+    expect(classifyGuess('micros', answers)).toBe('contains');
+    expect(classifyGuess('microondas', answers)).toBe('contains');
+    expect(classifyGuess('xmicrox', answers)).toBe('contains');
+  });
+
+  it('también detecta la respuesta con espacios o letras sueltas de por medio', () => {
+    expect(classifyGuess('mi cro', ['micro'])).toBe('contains');
+    expect(classifyGuess('es la mi c r o ya', ['micro'])).toBe('contains');
+    expect(classifyGuess('mote conhuesillo', ['mote con huesillo'])).toBe('contains');
+    expect(classifyGuess('motecon huesillo ricos', ['mote con huesillo'])).toBe('contains');
+  });
+
+  it('con respuestas de menos de 4 caracteres solo cuentan las palabras completas', () => {
+    expect(classifyGuess('sol', ['sol'])).toBe('correct');
+    expect(classifyGuess('es el sol', ['sol'])).toBe('contains');
+    expect(classifyGuess('solamente', ['sol'])).toBe('plain');
+    expect(classifyGuess('girasol', ['sol'])).toBe('plain');
+    expect(classifyGuess('s o l', ['sol'])).toBe('plain');
+    expect(classifyGuess('tenemos te', ['te'])).toBe('contains');
+    expect(classifyGuess('tenemos', ['te'])).toBe('plain');
   });
 });
 
@@ -53,7 +77,7 @@ describe('intentos', () => {
     expect(wordFx?.payload).toEqual({ word: 'huemul' });
   });
 
-  it('distancia 1 emite el mensaje a la sala y luego guess:close solo al autor', () => {
+  it('distancia 1 emite el mensaje solo al autor y luego guess:close', () => {
     const h = drawingGame(['Ana', 'Beto', 'Caro']);
     h.say('p2', 'huemol');
     const fx = h.last.effects;
@@ -62,7 +86,7 @@ describe('intentos', () => {
       'guess:close',
     ]);
     expect(emitsOf(fx, 'message:new')[0]).toMatchObject({
-      to: { kind: 'room' },
+      to: { kind: 'player', playerId: 'p2' },
       payload: { playerId: 'p2', text: 'huemol', channel: 'all' },
     });
     expect(emitsOf(fx, 'guess:close')[0]?.to).toEqual({ kind: 'player', playerId: 'p2' });
@@ -73,6 +97,16 @@ describe('intentos', () => {
     h.say('p2', 'huamol');
     expect(emitsOf(h.last.effects, 'guess:close')).toHaveLength(0);
     expect(emitsOf(h.last.effects, 'message:new')).toHaveLength(1);
+  });
+
+  it('un mensaje con la palabra pegada a otras letras también se retiene', () => {
+    const h = drawingGame(['Ana', 'Beto', 'Caro']);
+    h.say('p2', 'huemules');
+    expect(h.last.effects).toHaveLength(1);
+    expect(emitsOf(h.last.effects, 'message:new')[0]?.to).toEqual({
+      kind: 'player',
+      playerId: 'p2',
+    });
   });
 
   it('un mensaje que contiene la palabra solo llega a su autor', () => {
@@ -282,6 +316,29 @@ describe('puntaje en el motor', () => {
     // Ana: 10 + 1 + 1 por tres aciertos (incluido el de Beto, que se fue).
     expect(end?.payload.gains).toEqual({ p1: 12, p3: 8, p4: 6 });
     expect(end?.payload.scores).toEqual({ p1: 12, p3: 8, p4: 6 });
+  });
+
+  it('los aciertos de quien entró tarde puntúan para él y terminan el turno, no para el dibujante', () => {
+    const h = drawingGame(['Ana', 'Beto', 'Caro']);
+    h.join('Dani'); // llega con el turno en marcha
+    h.say('p2', 'huemul');
+    h.say('p3', 'huemul');
+    expect(h.state.phase).toBe('DRAWING'); // Dani aún falta
+    h.say('p4', 'huemul');
+    expect(h.state.phase).toBe('TURN_END');
+    const [end] = emitsOf(h.last.effects, 'turn:end');
+    expect(end?.payload.reason).toBe('all_guessed');
+    // Ana: 10 + 1 por los dos aciertos de Beto y Caro; el de Dani (6 puntos para él) no suma.
+    expect(end?.payload.gains).toEqual({ p1: 11, p2: 10, p3: 8, p4: 6 });
+  });
+
+  it('si solo acierta quien entró tarde, el dibujante no gana nada', () => {
+    const h = drawingGame(['Ana', 'Beto']);
+    h.join('Caro');
+    h.say('p3', 'huemul');
+    h.advanceTo(h.state.deadline!);
+    const [end] = emitsOf(h.last.effects, 'turn:end');
+    expect(end?.payload.gains).toEqual({ p1: 0, p2: 0, p3: 10 });
   });
 
   it('los puntajes se acumulan entre turnos', () => {

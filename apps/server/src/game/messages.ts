@@ -10,12 +10,22 @@ import type { PlayerId } from './types.js';
 
 export type GuessKind = 'correct' | 'contains' | 'close' | 'plain';
 
+/** Respuestas de menos caracteres que esto solo se detectan por palabras completas. */
+const MIN_EMBEDDED_LENGTH = 4;
+
+/** La respuesta aparece como subcadena del intento, también ignorando los espacios de ambos. */
+function embeds(normalized: string, answer: string): boolean {
+  if (answer.length < MIN_EMBEDDED_LENGTH) return false;
+  if (normalized.includes(answer)) return true;
+  return normalized.replaceAll(' ', '').includes(answer.replaceAll(' ', ''));
+}
+
 /** Clasifica un intento ya normalizado contra las respuestas aceptadas. */
 export function classifyGuess(normalized: string, answers: readonly string[]): GuessKind {
   if (normalized === '') return 'plain';
   if (answers.includes(normalized)) return 'correct';
   const padded = ` ${normalized} `;
-  if (answers.some((a) => padded.includes(` ${a} `))) return 'contains';
+  if (answers.some((a) => padded.includes(` ${a} `) || embeds(normalized, a))) return 'contains';
   if (answers.some((a) => levenshtein(normalized, a, 1) === 1)) return 'close';
   return 'plain';
 }
@@ -53,7 +63,8 @@ export function handleMessage(env: Env, playerId: PlayerId, rawText: string): Ou
       emit(env, toOne(playerId), 'message:new', { playerId, text, channel: 'all' });
       break;
     case 'close':
-      emit(env, toRoom, 'message:new', { playerId, text, channel: 'all' });
+      // Un casi puede ser la palabra con una letra de más o de menos: no se emite a la sala.
+      emit(env, toOne(playerId), 'message:new', { playerId, text, channel: 'all' });
       emit(env, toOne(playerId), 'guess:close', undefined);
       break;
     case 'plain':

@@ -51,6 +51,7 @@ export interface TurnState {
   revealed: number[]; // índices revelados, según getMaskableIndices
   pendingHints: number[]; // instantes absolutos ascendentes, todos < deadline
   guesses: Guess[];
+  presentIds: PlayerId[]; // jugadores presentes al empezar a dibujar; solo sus aciertos puntúan al dibujante
   result: TurnEnd | null; // se fija al entrar en TURN_END
 }
 

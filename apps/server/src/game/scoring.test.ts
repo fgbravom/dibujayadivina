@@ -23,6 +23,7 @@ function turn(drawerId: string, guessers: string[]): TurnState {
     revealed: [],
     pendingHints: [],
     guesses: guessers.map((playerId, i) => ({ playerId, points: guesserPoints(i) })),
+    presentIds: [drawerId, ...guessers],
     result: null,
   };
 }

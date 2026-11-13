@@ -106,6 +106,7 @@ export function removePlayer(env: Env, playerId: PlayerId): void {
 
   const view = toPlayer(s, player);
   s.players.splice(index, 1);
+  s.drawnThisRound = s.drawnThisRound.filter((id) => id !== playerId);
   emit(env, toRoom, 'player:left', view);
 
   if (s.hostId === playerId) transferHost(env);

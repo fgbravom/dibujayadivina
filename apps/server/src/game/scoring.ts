@@ -10,7 +10,7 @@ export function guesserPoints(position: number): number {
   return GUESSER_SCORES[i] ?? 0;
 }
 
-/** Puntos del dibujante según cuántos acertaron (incluye a quien acertó y se fue). */
+/** Puntos del dibujante según cuántos acertaron (incluye a quien acertó y se fue, no a quien llegó tarde). */
 export function drawerPoints(guessCount: number): number {
   if (guessCount <= 0) return 0;
   return DRAWER_FIRST_GUESS_SCORE + DRAWER_EXTRA_GUESS_SCORE * (guessCount - 1);
@@ -33,7 +33,9 @@ export function computeGains(
     if (g.playerId in gains) gains[g.playerId] = (gains[g.playerId] ?? 0) + g.points;
   }
   if (turn.drawerId in gains) {
-    gains[turn.drawerId] = (gains[turn.drawerId] ?? 0) + drawerPoints(turn.guesses.length);
+    // Solo cuentan los aciertos de quienes ya estaban al empezar a dibujar.
+    const counted = turn.guesses.filter((g) => turn.presentIds.includes(g.playerId)).length;
+    gains[turn.drawerId] = (gains[turn.drawerId] ?? 0) + drawerPoints(counted);
   }
   return gains;
 }

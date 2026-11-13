@@ -426,6 +426,17 @@ describe('fin de partida', () => {
     expect(h.state.ranking).toHaveLength(3);
   });
 
+  it('al terminar la partida emite strokes:reset junto con game:end', () => {
+    const h = startedGame(['Ana', 'Beto'], { settings: { rounds: 1 } });
+    while (h.state.phase !== 'GAME_END') h.advanceTo(h.state.deadline ?? h.now);
+    const fx = h.last.effects;
+    const iReset = fx.findIndex((e) => e.type === 'strokes:reset');
+    const iEnd = fx.findIndex((e) => e.type === 'emit' && e.event === 'game:end');
+    expect(iEnd).toBeGreaterThanOrEqual(0);
+    expect(iReset).toBeGreaterThanOrEqual(0);
+    expect(iReset).toBeLessThan(iEnd);
+  });
+
   it('start del anfitrión en GAME_END lleva a LOBBY conservando los puntajes', () => {
     const h = startedGame(['Ana', 'Beto'], { settings: { rounds: 1 } });
     chooseWord(h);
@@ -459,5 +470,39 @@ describe('fin de partida', () => {
     expect(h.state.hostId).toBe('p2');
     expect(h.dispatch({ type: 'start', playerId: 'p2' }).error).toBeUndefined();
     expect(h.state.phase).toBe('LOBBY');
+  });
+});
+
+describe('estado acotado', () => {
+  it('al borrar un jugador se quita de drawnThisRound', () => {
+    const h = drawingGame(['Ana', 'Beto', 'Caro']);
+    h.advanceTo(h.state.deadline!); // TURN_END
+    h.advanceTo(h.state.deadline!); // turno de Beto
+    expect(h.state.drawnThisRound).toEqual(['p1', 'p2']);
+    h.dispatch({ type: 'leave', playerId: 'p1' });
+    expect(h.state.drawnThisRound).toEqual(['p2']);
+  });
+
+  it('el borrado por fin de la gracia también lo quita', () => {
+    const h = drawingGame(['Ana', 'Beto', 'Caro']);
+    h.disconnect('p3');
+    h.advanceBy(GRACE);
+    expect(h.state.players.map((p) => p.id)).toEqual(['p1', 'p2']);
+    expect(h.state.drawnThisRound).toEqual(['p1']);
+    h.dispatch({ type: 'leave', playerId: 'p1' });
+    expect(h.state.drawnThisRound).toEqual([]);
+  });
+
+  it.each([
+    [600, 603],
+    [601, 3],
+  ])('con %i usedWords, al empezar el turno siguiente quedan %i', (before, after) => {
+    const h = drawingGame(['Ana', 'Beto', 'Caro']);
+    h.state.usedWords = Array.from({ length: before }, (_, i) => `usada${i}`);
+    h.advanceTo(h.state.deadline!); // TURN_END
+    h.advanceTo(h.state.deadline!); // CHOOSING de Beto
+    expect(h.state.phase).toBe('CHOOSING');
+    expect(h.state.usedWords).toHaveLength(after);
+    if (before > 600) expect(h.state.usedWords).toEqual(h.state.turn?.options.map((o) => o.text));
   });
 });

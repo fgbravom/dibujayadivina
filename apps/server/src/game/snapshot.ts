@@ -27,6 +27,7 @@ export function currentMask(state: GameState): string | null {
 export function buildSnapshot(state: GameState, viewerId: PlayerId, now: number): EngineSnapshot {
   const turn = state.turn;
   const isDrawer = turn !== null && turn.drawerId === viewerId;
+  const knowsWord = isDrawer || (turn?.guesses.some((g) => g.playerId === viewerId) ?? false);
   return {
     phase: state.phase,
     settings: { ...state.settings },
@@ -39,7 +40,7 @@ export function buildSnapshot(state: GameState, viewerId: PlayerId, now: number)
     mask: currentMask(state),
     endsAt: state.deadline,
     serverNow: now,
-    word: isDrawer && state.phase === 'DRAWING' ? (turn.word?.text ?? null) : null,
+    word: knowsWord && state.phase === 'DRAWING' ? (turn?.word?.text ?? null) : null,
     wordOptions: isDrawer && state.phase === 'CHOOSING' ? turn.options.map((o) => o.text) : null,
     turnEnd: state.phase === 'TURN_END' ? (turn?.result ?? null) : null,
     ranking: state.phase === 'GAME_END' ? (state.ranking ?? null) : null,
