@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useState, type FormEvent } from 'react';
 import { NICKNAME_MAX_LENGTH, ROOM_CODE_LENGTH, type ErrorCode } from '@dya/shared';
 import { Button } from '../components/Button';
 import { ErrorNotice } from '../components/ErrorNotice';
@@ -57,6 +57,12 @@ export function HomeScreen({
   const [code, setCode] = useState('');
   // Los errores de validación aparecen recién al intentar enviar, no mientras se escribe.
   const [attempted, setAttempted] = useState<'create' | 'join' | null>(null);
+
+  // El botón flotante de Buy Me a Coffee se muestra solo en la portada: lo controla el CSS con esta clase.
+  useEffect(() => {
+    document.documentElement.classList.add('home-screen');
+    return () => document.documentElement.classList.remove('home-screen');
+  }, []);
 
   const invitedCode = normalizeRoomCode(inviteCode ?? '');
   const invited = invitedCode !== '';
