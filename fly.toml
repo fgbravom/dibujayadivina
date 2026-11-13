@@ -1,8 +1,8 @@
 # Plantilla de Fly.io para Dibuja y Adivina. Guía completa en docs/despliegue.md.
 #
-# Reemplazar `app` por un nombre único (es el subdominio <app>.fly.dev). Con
-# `fly launch --no-deploy --copy-config` Fly conserva este archivo y registra la app.
-app = "REEMPLAZAR-NOMBRE-DE-APP"
+# `app` es el subdominio <app>.fly.dev. Con `fly launch --no-deploy --copy-config`
+# Fly conserva este archivo y registra la app.
+app = "dibujayadivina"
 
 # Santiago de Chile (scl), por latencia. CONFIRMAR que la región exista en tu cuenta
 # (`fly platform regions`). Si no aparece, usar `gru` (São Paulo) o la región
