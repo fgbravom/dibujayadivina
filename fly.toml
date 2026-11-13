@@ -4,10 +4,9 @@
 # Fly conserva este archivo y registra la app.
 app = "dibujayadivina"
 
-# Santiago de Chile (scl), por latencia. CONFIRMAR que la región exista en tu cuenta
-# (`fly platform regions`). Si no aparece, usar `gru` (São Paulo) o la región
-# sudamericana más cercana que muestre esa lista.
-primary_region = "scl"
+# São Paulo (gru): la región más cercana a Chile disponible en la cuenta; Santiago (scl)
+# no aparece en `fly platform regions`.
+primary_region = "gru"
 
 [build]
   dockerfile = "Dockerfile"
