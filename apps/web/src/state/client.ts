@@ -52,6 +52,8 @@ let joined: SavedRoom | null = null;
 let ready = false;
 /** Hay un `room:join` de reconexión esperando su acuse. */
 let rejoining = false;
+/** Código destino guardado por `popstate` cuando se confirma salir de la sala. */
+let pendingInviteCode: string | null = null;
 let started = false;
 /** El socket se cayó y aún no volvió a conectar: la próxima conexión es una reconexión. */
 let wasDisconnected = false;
@@ -74,6 +76,11 @@ function showRoomUrl(code: string): void {
 // --- Eventos del servidor ---------------------------------------------------
 
 function handleServerEvent(event: ServerEvent): void {
+  if (event.type === 'system:online') {
+    set({ onlineCount: event.payload.count });
+    return;
+  }
+
   const command = canvasCommandFor(event);
   if (command) canvasBridge.dispatch(command);
 
@@ -254,6 +261,7 @@ function leaveRoom(options: { keepUrl?: boolean } = {}): void {
     inviteCode: null,
     homeError: null,
     roomError: null,
+    confirmingLeave: false,
     session: initialSession,
   });
   reloadIfOutdated();
@@ -267,13 +275,10 @@ function onPopState(): void {
     return;
   }
   if (code === joined.code) return;
-  if (window.confirm('¿Quieres salir de la sala?')) {
-    leaveRoom({ keepUrl: true });
-    set({ inviteCode: code });
-  } else {
-    // Se queda: se vuelve a poner la ruta de la sala.
-    window.history.pushState(null, '', roomSharePath(joined.code));
-  }
+  pendingInviteCode = code;
+  // Se queda visualmente en la sala hasta que confirme; el modal decide el destino.
+  window.history.pushState(null, '', roomSharePath(joined.code));
+  set({ confirmingLeave: true });
 }
 
 /** Hay una sala en curso o a punto de estarlo: una recarga sola interrumpiría a la persona. */
@@ -354,6 +359,25 @@ export const actions = {
   },
   leaveRoom(): void {
     leaveRoom();
+  },
+  requestLeave(): void {
+    pendingInviteCode = null;
+    set({ confirmingLeave: true });
+  },
+  confirmLeave(): void {
+    const code = pendingInviteCode;
+    pendingInviteCode = null;
+    if (code !== null) {
+      leaveRoom({ keepUrl: true });
+      set({ inviteCode: code });
+      window.history.replaceState(null, '', roomSharePath(code));
+    } else {
+      leaveRoom();
+    }
+  },
+  cancelLeave(): void {
+    pendingInviteCode = null;
+    set({ confirmingLeave: false });
   },
   /** "Retomar aquí": vuelve a abrir la conexión que el servidor cerró por abrirse en otra pestaña. */
   resumeHere(): void {

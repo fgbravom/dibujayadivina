@@ -58,6 +58,7 @@ export const SERVER_EVENTS = {
   GUESS_CORRECT: 'guess:correct',
   GUESS_CLOSE: 'guess:close',
   SYSTEM_ERROR: 'system:error',
+  SYSTEM_ONLINE: 'system:online',
 } as const;
 
 // --- Acuses (ack) de room:create y room:join ------------------------------
@@ -90,6 +91,7 @@ export type GameEndPayload = { ranking: RankingEntry[] };
 export type MessageNewPayload = { playerId: string; text: string; channel: MessageChannel };
 export type GuessCorrectPayload = { playerId: string };
 export type SystemErrorPayload = { code: ErrorCode };
+export type SystemOnlinePayload = { count: number };
 
 // --- Mapas de eventos para los genéricos de Socket.IO ---------------------
 
@@ -129,6 +131,7 @@ export interface ServerToClientEvents {
   'guess:correct': (payload: GuessCorrectPayload) => void;
   'guess:close': () => void;
   'system:error': (payload: SystemErrorPayload) => void;
+  'system:online': (payload: SystemOnlinePayload) => void;
 }
 
 export type ClientEventName = keyof ClientToServerEvents;

@@ -25,11 +25,15 @@ export type GameStore = {
   homeError: ErrorCode | null;
   /** Último `system:error` relevante, para la sala. */
   roomError: ErrorCode | null;
+  /** El modal propio de confirmación de salida de sala está visible. */
+  confirmingLeave: boolean;
   session: SessionState;
   /** Versión del cliente publicada cuando difiere de la que corre; `null` si esta pestaña está al día. */
   newVersion: string | null;
   /** Se cerró el aviso de versión nueva (vuelve a salir en la siguiente comprobación). */
   updateDismissed: boolean;
+  /** Cantidad de personas conectadas al servidor en este momento. */
+  onlineCount: number | null;
 };
 
 export const useGameStore = create<GameStore>()(() => ({
@@ -41,7 +45,9 @@ export const useGameStore = create<GameStore>()(() => ({
   inviteCode: null,
   homeError: null,
   roomError: null,
+  confirmingLeave: false,
   session: initialSession,
   newVersion: null,
   updateDismissed: false,
+  onlineCount: null,
 }));

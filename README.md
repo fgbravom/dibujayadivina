@@ -56,6 +56,6 @@ Documentación interna:
 
 ## Aportar un café
 
-Si el juego les sacó unas risas, puedes apoyar el proyecto con un café. Se agradece de corazón.
+Si el juego les sacó unas risas, puedes apoyar el proyecto con un café. Se agradece.
 
 [![Invitame un café en Buy Me a Coffee](https://img.buymeacoffee.com/button-api/?text=Invitame%20un%20caf%C3%A9&emoji=%E2%98%95&slug=fgbravom&button_colour=FF813F&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff)](https://www.buymeacoffee.com/fgbravom)

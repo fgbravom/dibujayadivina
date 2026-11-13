@@ -138,6 +138,8 @@ function HomeVariant({
       inviteCode={inviteCode ?? null}
       error={currentError}
       onDismissError={() => setError(null)}
+      connected
+      onlineCount={12}
       onCreateRoom={(name) => log(`room:create name="${name}"`)}
       onJoinRoom={(code, name) => log(`room:join code=${code} name="${name}"`)}
     />

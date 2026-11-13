@@ -230,6 +230,7 @@ export function reduceSession(
     case 'canvas:undo':
     case 'canvas:clear':
     case 'system:error':
+    case 'system:online':
       return state;
   }
 }

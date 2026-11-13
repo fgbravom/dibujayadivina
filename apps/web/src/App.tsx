@@ -1,13 +1,15 @@
 import type { ReactNode } from 'react';
 import { GameEndScreen, HomeScreen, LobbyScreen } from './ui';
 import { actions } from './state/client';
-import { GameToast, ResumingScreen, TakenOverNotice, UpdateNotice } from './state/Notices';
+import {
+  GameToast,
+  LeaveConfirmNotice,
+  ResumingScreen,
+  TakenOverNotice,
+  UpdateNotice,
+} from './state/Notices';
 import { GameView } from './state/GameView';
 import { useGameStore } from './state/store';
-
-function confirmLeave(): void {
-  if (window.confirm('¿Quieres salir de la sala?')) actions.leaveRoom();
-}
 
 /** Elige la pantalla según el estado de la sala (PLAN.md sección 2: LOBBY → CHOOSING → DRAWING → TURN_END → GAME_END). */
 export function App() {
@@ -21,6 +23,8 @@ export function App() {
   const roomError = useGameStore((s) => s.roomError);
   const newVersion = useGameStore((s) => s.newVersion);
   const updateDismissed = useGameStore((s) => s.updateDismissed);
+  const confirmingLeave = useGameStore((s) => s.confirmingLeave);
+  const onlineCount = useGameStore((s) => s.onlineCount);
   const { room, feed, serverOffsetMs } = useGameStore((s) => s.session);
 
   // Mientras se abre el primer socket no se asusta con un aviso de conexión.
@@ -38,6 +42,7 @@ export function App() {
         onDismissError={actions.dismissHomeError}
         busy={busy}
         connected={connected}
+        onlineCount={onlineCount}
         onCreateRoom={actions.createRoom}
         onJoinRoom={actions.joinRoom}
         onNameChange={actions.setNickname}
@@ -54,7 +59,7 @@ export function App() {
         onChangeSettings={actions.changeSettings}
         onStart={actions.startGame}
         onSendMessage={actions.sendMessage}
-        onLeave={confirmLeave}
+        onLeave={actions.requestLeave}
       />
     );
   } else if (room.phase === 'GAME_END') {
@@ -66,7 +71,7 @@ export function App() {
         connected={connected}
         // "Jugar de nuevo" es `game:start`: el servidor devuelve la sala a la sala de espera.
         onPlayAgain={actions.startGame}
-        onLeave={confirmLeave}
+        onLeave={actions.requestLeave}
       />
     );
   } else {
@@ -77,7 +82,7 @@ export function App() {
           feed={feed}
           connected={connected}
           serverOffsetMs={serverOffsetMs}
-          onLeave={confirmLeave}
+          onLeave={actions.requestLeave}
         />
         <GameToast error={roomError} onDismiss={actions.dismissRoomError} />
       </>
@@ -89,6 +94,9 @@ export function App() {
       {screen}
       {room && newVersion !== null && !updateDismissed && (
         <UpdateNotice onUpdate={actions.reloadForUpdate} onDismiss={actions.dismissUpdate} />
+      )}
+      {room && confirmingLeave && !takenOver && (
+        <LeaveConfirmNotice onConfirm={actions.confirmLeave} onCancel={actions.cancelLeave} />
       )}
       {takenOver && <TakenOverNotice onResume={actions.resumeHere} />}
     </>

@@ -5,6 +5,7 @@ import type { ErrorCode } from '@dya/shared';
 import { useEffect } from 'react';
 import { ErrorNotice } from '../ui/components/ErrorNotice';
 import { Button } from '../ui/components/Button';
+import { LogoutIcon } from '../ui/components/icons';
 import { Logo } from '../ui/components/Logo';
 
 /** Errores que no vale la pena mostrar en plena partida: carreras normales (acción tardía) del juego. */
@@ -30,6 +31,70 @@ export function TakenOverNotice({ onResume }: { onResume: () => void }) {
         <Button variant="primary" size="lg" onClick={onResume} data-testid="resume-here">
           Retomar aquí
         </Button>
+      </div>
+    </div>
+  );
+}
+
+export function LeaveConfirmNotice({
+  onConfirm,
+  onCancel,
+}: {
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCancel();
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
+
+  return (
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="leave-confirm-title"
+      aria-describedby="leave-confirm-desc"
+      data-testid="leave-confirm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4"
+      onClick={(event) => {
+        if (event.currentTarget === event.target) onCancel();
+      }}
+    >
+      <div className="flex w-full max-w-sm animate-pop-in flex-col gap-4 rounded-2xl border-2 border-ink bg-card p-5 text-center shadow-pop">
+        <h2 id="leave-confirm-title" className="text-xl font-black">
+          ¿Quieres salir de la sala?
+        </h2>
+        <p id="leave-confirm-desc" className="font-bold text-ink-soft">
+          Si sales ahora, volverás al inicio.
+        </p>
+        <div className="flex gap-3">
+          <Button
+            variant="secondary"
+            size="lg"
+            className="flex-1"
+            onClick={onCancel}
+            data-testid="leave-cancel"
+            autoFocus
+          >
+            Quedarme
+          </Button>
+          <Button
+            variant="primary"
+            size="lg"
+            className="flex-1"
+            onClick={onConfirm}
+            data-testid="leave-confirm-btn"
+          >
+            <LogoutIcon />
+            Salir
+          </Button>
+        </div>
       </div>
     </div>
   );

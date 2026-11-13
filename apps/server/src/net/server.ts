@@ -217,6 +217,10 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
     socket.emit('system:error', { code });
   }
 
+  function broadcastOnlineCount(): void {
+    io.emit('system:online', { count: sessions.size });
+  }
+
   function connectionOf(player: EnginePlayer | undefined): string[] {
     return player?.connected && player.connId !== null ? [player.connId] : [];
   }
@@ -435,6 +439,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
       ip: ipOf(socket),
     };
     sessions.set(socket.id, session);
+    broadcastOnlineCount();
     ipLimiter.connected(session.ip);
     const loose = socket as unknown as LooseSocket;
 
@@ -582,6 +587,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
 
     socket.on('disconnect', () => {
       sessions.delete(socket.id);
+      broadcastOnlineCount();
       ipLimiter.disconnected(session.ip);
       guard(socket, null, () => {
         const who = resolve(session);

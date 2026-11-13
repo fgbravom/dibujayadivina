@@ -27,6 +27,8 @@ export type HomeScreenProps = {
   busy?: boolean;
   /** `false` muestra el aviso de reconexión y bloquea los botones. */
   connected?: boolean;
+  /** Cantidad de personas conectadas al servidor en este momento. */
+  onlineCount?: number | null;
   /** Recibe el apodo ya recortado y validado. */
   onCreateRoom: (name: string) => void;
   /** Recibe el código en mayúsculas (4 letras) y el apodo recortado y validado. */
@@ -45,6 +47,7 @@ export function HomeScreen({
   onDismissError,
   busy = false,
   connected = true,
+  onlineCount = null,
   onCreateRoom,
   onJoinRoom,
   onNameChange,
@@ -101,7 +104,26 @@ export function HomeScreen({
     <div className="safe-pad flex min-h-(--app-h) flex-col">
       <ReconnectBanner connected={connected} />
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 px-4 py-8">
-        <Logo />
+        <div className="flex flex-col items-center gap-3">
+          <Logo />
+          {connected && onlineCount !== null && onlineCount > 0 && (
+            <div
+              data-testid="online-count"
+              aria-live="polite"
+              className="inline-flex items-center gap-2 rounded-full border-2 border-ink bg-card px-3 py-1 text-xs font-extrabold text-ink shadow-pop-sm"
+            >
+              <span
+                aria-hidden="true"
+                className="size-2.5 rounded-full border border-ink bg-pasto"
+              />
+              <span className="tabular-nums">
+                {onlineCount === 1
+                  ? '1 jugador online'
+                  : `${onlineCount} jugadores online`}
+              </span>
+            </div>
+          )}
+        </div>
 
         <form
           onSubmit={submit}

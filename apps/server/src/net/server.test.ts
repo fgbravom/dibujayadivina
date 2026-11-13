@@ -6,6 +6,7 @@ import type {
   RoomState,
   Stroke,
   SystemErrorPayload,
+  SystemOnlinePayload,
   TurnChoosingPayload,
   TurnEndPayload,
   TurnOptionsPayload,
@@ -298,6 +299,32 @@ describe('rellenos (bote de pintura)', () => {
 });
 
 describe('reconexión y sesiones', () => {
+  it('emite system:online con la cantidad de conexiones activas', async () => {
+    const server = await startServer();
+    const a = await connect(server);
+    expect(await a.waitFor<SystemOnlinePayload>('system:online')).toEqual({ count: 1 });
+
+    const b = await connect(server);
+    expect(await a.waitFor<SystemOnlinePayload>('system:online', (p) => p.count === 2)).toEqual({
+      count: 2,
+    });
+    expect(await b.waitFor<SystemOnlinePayload>('system:online', (p) => p.count === 2)).toEqual({
+      count: 2,
+    });
+
+    a.close();
+    expect(await b.waitFor<SystemOnlinePayload>('system:online', (p) => p.count === 1)).toEqual({
+      count: 1,
+    });
+
+    b.close();
+    // Al cerrar el último socket no queda nadie que escuche, pero el servidor sigue vivo.
+    // Se verifica indirectamente reconectando y leyendo el conteo desde cero.
+    const c = await connect(server);
+    expect(await c.waitFor<SystemOnlinePayload>('system:online')).toEqual({ count: 1 });
+    c.close();
+  });
+
   it('quien se reconecta con la misma sesión recibe puntajes y trazos del turno', async () => {
     const server = await startServer({ drawMs: 5000 });
     const lobby = await createLobby(server, 3);
