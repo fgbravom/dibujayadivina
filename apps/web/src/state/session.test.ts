@@ -171,6 +171,12 @@ describe('eventos del turno', () => {
     expect(roomOf(choosing())).toMatchObject({ round: 1, totalRounds: 3 });
   });
 
+  it('turn:choosing agrega una línea que separa los mensajes del turno anterior', () => {
+    const feed = choosing().feed;
+    expect(feed.at(-1)).toMatchObject({ kind: 'system', tone: 'info' });
+    expect(JSON.stringify(feed.at(-1))).toMatch(/dibujar/);
+  });
+
   it('turn:options guarda las opciones', () => {
     const s = run(choosing(), { type: 'turn:options', payload: { words: ['sol', 'luna', 'mar'] } });
     expect(roomOf(s).wordOptions).toEqual(['sol', 'luna', 'mar']);

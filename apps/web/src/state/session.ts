@@ -17,6 +17,7 @@ import { computeServerOffset } from '../ui/lib/clock';
 import {
   closeFeedItem,
   guessedFeedItem,
+  infoFeedItem,
   joinedFeedItem,
   leftFeedItem,
   messageToFeedItem,
@@ -109,7 +110,7 @@ export function reduceSession(
 
     case 'player:left': {
       const players = room.players.filter((p) => p.id !== event.payload.id);
-      const next = {
+      const next: SessionState = {
         ...state,
         room: { ...room, players, hostId: resolveHostId(players, room.hostId) },
       };
@@ -120,7 +121,9 @@ export function reduceSession(
       return { ...state, room: upsertPlayer(room, event.payload) };
 
     case 'turn:choosing': {
-      return {
+      const { drawerId } = event.payload;
+      const drawer = room.players.find((p) => p.id === drawerId);
+      const next: SessionState = {
         ...state,
         room: {
           ...mapPlayers(room, (p) => (p.guessed ? { ...p, guessed: false } : p)),
@@ -137,6 +140,15 @@ export function reduceSession(
           strokes: [],
         },
       };
+      // Separa los mensajes del turno anterior: sin esto un "¡Adivinaste!" viejo parece del turno nuevo.
+      return withFeed(next, (id) =>
+        infoFeedItem(
+          drawerId === room.selfId
+            ? 'Te toca dibujar'
+            : `Le toca dibujar a ${drawer?.name ?? 'alguien'}`,
+          id,
+        ),
+      );
     }
 
     case 'turn:options':
@@ -170,7 +182,7 @@ export function reduceSession(
     case 'guess:correct': {
       const { playerId } = event.payload;
       const guesser = room.players.find((p) => p.id === playerId);
-      const next = {
+      const next: SessionState = {
         ...state,
         room: mapPlayers(room, (p) => (p.id === playerId ? { ...p, guessed: true } : p)),
       };
