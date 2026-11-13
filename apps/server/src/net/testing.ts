@@ -67,8 +67,13 @@ export class TestClient {
   playerId = '';
   private waiters: Waiter[] = [];
 
-  constructor(url: string) {
-    this.socket = io(url, { transports: ['websocket'], forceNew: true, reconnection: false });
+  constructor(url: string, extraHeaders: Record<string, string> = {}) {
+    this.socket = io(url, {
+      transports: ['websocket'],
+      forceNew: true,
+      reconnection: false,
+      extraHeaders,
+    });
     this.socket.onAny((event: string, ...args: unknown[]) => this.record(event, args[0]));
     this.socket.on('disconnect', (reason) => this.record('disconnect', reason));
     clients.push(this);
@@ -155,8 +160,12 @@ export class TestClient {
   }
 }
 
-export async function connect(server: GameServer): Promise<TestClient> {
-  return new TestClient(server.url).connected();
+/** Conecta un cliente; `extraHeaders` simula lo que añadiría un proxy (o un navegador, como `origin`). */
+export async function connect(
+  server: GameServer,
+  extraHeaders: Record<string, string> = {},
+): Promise<TestClient> {
+  return new TestClient(server.url, extraHeaders).connected();
 }
 
 export interface Lobby {

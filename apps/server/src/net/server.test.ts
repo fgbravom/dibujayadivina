@@ -332,7 +332,9 @@ describe('errores y límites', () => {
         error: 'invalid_payload',
       },
     );
-    expect(await client.ack('room:create', 'hola')).toEqual({
+    // Otro socket: el primero ya gastó la ráfaga de entradas.
+    const other = await connect(server);
+    expect(await other.ack('room:create', 'hola')).toEqual({
       ok: false,
       error: 'invalid_payload',
     });

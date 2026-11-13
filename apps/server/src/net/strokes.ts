@@ -15,7 +15,7 @@ export interface StrokeLimits {
 export const DEFAULT_STROKE_LIMITS: StrokeLimits = {
   strokesPerTurn: MAX_STROKES_PER_TURN,
   pointsPerStroke: 5_000,
-  pointsPerTurn: 100_000,
+  pointsPerTurn: 30_000,
 };
 
 /**

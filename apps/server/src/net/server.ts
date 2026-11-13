@@ -30,8 +30,8 @@ import type {
   Recipient,
   ReduceResult,
 } from '../game/index.js';
-import { SocketLimiter } from './rate-limit.js';
-import type { Bucket } from './rate-limit.js';
+import { IpLimiter, PlayerLimiter, SocketLimiter, clientIp } from './rate-limit.js';
+import type { Bucket, PlayerBucket } from './rate-limit.js';
 import { RoomRegistry } from './rooms.js';
 import type { Room } from './rooms.js';
 import { createStaticHandler } from './static.js';
@@ -55,6 +55,24 @@ export interface GameServerOptions {
   words?: string[];
   rng?: () => number;
   strokeLimits?: Partial<StrokeLimits>;
+  /** Una sala en LOBBY o GAME_END sin acciones de jugadores durante este tiempo se cierra. Por defecto 30 min. */
+  roomIdleMs?: number;
+  /** Conexiones simultáneas por IP. Por defecto 40. */
+  maxConnectionsPerIp?: number;
+  /** Salas creadas por IP cada minuto. Por defecto 10. */
+  maxRoomsPerIpPerMinute?: number;
+  /**
+   * Cabecera con la IP real del cliente cuando el servidor está detrás de un proxy de confianza
+   * (p. ej. `fly-client-ip`). Sin ella no se confía en ninguna cabecera y se usa la IP de la conexión.
+   */
+  clientIpHeader?: string | null;
+  /**
+   * Rechaza las conexiones con `Origin` cuyo host no coincide con el `Host` de la petición (salvo los
+   * de `allowedOrigins`). Por defecto false; `index.ts` lo activa con NODE_ENV=production.
+   */
+  checkOrigin?: boolean;
+  /** Orígenes completos permitidos aunque no coincidan con el `Host`, p. ej. `https://juego.example.com`. */
+  allowedOrigins?: string[];
   /** Registro de errores y avisos; por defecto `console`. */
   logger?: Pick<Console, 'error' | 'info'>;
 }
@@ -85,13 +103,19 @@ interface Session {
   roomCode: string | null;
   playerId: string | null;
   limiter: SocketLimiter;
+  ip: string;
 }
 
 const DEFAULT_MAX_ROOMS = 500;
+const DEFAULT_ROOM_IDLE_MS = 30 * 60_000;
 /** Un setTimeout no admite más de 2^31-1 ms. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
 /** Un mensaje legítimo pesa del orden de 1 KB (64 puntos); el tope por defecto de Socket.IO es 1 MB. */
 const MAX_BUFFER_BYTES = 64 * 1024;
+
+function normalizeOrigin(origin: string): string {
+  return origin.trim().replace(/\/+$/, '').toLowerCase();
+}
 
 const DEFAULT_WEB_DIR = fileURLToPath(new URL('../../../web/dist', import.meta.url));
 
@@ -117,6 +141,17 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
     options.strokeLimits ?? {},
   );
   const sessions = new Map<string, Session>();
+  const roomIdleMs = options.roomIdleMs ?? DEFAULT_ROOM_IDLE_MS;
+  const ipHeader = options.clientIpHeader?.trim().toLowerCase() || null;
+  const ipLimiter = new IpLimiter({
+    ...(options.maxConnectionsPerIp !== undefined && {
+      maxConnections: options.maxConnectionsPerIp,
+    }),
+    ...(options.maxRoomsPerIpPerMinute !== undefined && {
+      maxRoomsPerWindow: options.maxRoomsPerIpPerMinute,
+    }),
+  });
+  const allowedOrigins = new Set((options.allowedOrigins ?? []).map(normalizeOrigin));
 
   // --- HTTP -----------------------------------------------------------------
 
@@ -144,6 +179,29 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
   const io: GameIo = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     serveClient: false,
     maxHttpBufferSize: MAX_BUFFER_BYTES,
+    allowRequest: (req, callback) => {
+      if (!options.checkOrigin) return callback(null, true);
+      const origin = req.headers.origin;
+      if (origin === undefined) return callback(null, true);
+      if (allowedOrigins.has(normalizeOrigin(origin))) return callback(null, true);
+      let sameHost = false;
+      try {
+        const host = req.headers.host?.toLowerCase();
+        sameHost = host !== undefined && new URL(origin).host.toLowerCase() === host;
+      } catch {
+        // Un Origin ilegible (p. ej. "null") nunca coincide.
+      }
+      if (!sameHost) logger.info(`[socket] origen rechazado: ${origin}`);
+      callback(sameHost ? null : 'origin_not_allowed', sameHost);
+    },
+  });
+
+  const ipOf = (socket: GameSocket): string =>
+    clientIp(socket.handshake.headers, socket.handshake.address, ipHeader);
+
+  io.use((socket, next) => {
+    if (ipLimiter.canConnect(ipOf(socket))) return next();
+    next(new Error('too_many_connections'));
   });
 
   // --- Entrega de efectos ---------------------------------------------------
@@ -222,6 +280,45 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
     }
   }
 
+  /** Registra una acción de un jugador: reinicia el reloj de inactividad de la sala. */
+  function touch(room: Room): void {
+    room.lastActivity = now();
+  }
+
+  function scheduleIdleCheck(room: Room, delayMs: number): void {
+    if (room.idleTimer) clearTimeout(room.idleTimer);
+    room.idleTimer = setTimeout(
+      () => {
+        room.idleTimer = null;
+        checkIdle(room);
+      },
+      Math.min(delayMs, MAX_TIMEOUT_MS),
+    );
+  }
+
+  /** Cierra la sala si está en LOBBY o GAME_END y nadie hizo nada durante `roomIdleMs`; si no, reprograma. */
+  function checkIdle(room: Room): void {
+    if (registry.get(room.code) !== room) return;
+    const remaining = room.lastActivity + roomIdleMs - now();
+    const quiet = room.state.phase === 'LOBBY' || room.state.phase === 'GAME_END';
+    if (remaining <= 0 && quiet) {
+      logger.info(`[sala ${room.code}] cerrada por inactividad`);
+      destroyRoom(room, 'room_not_found');
+      return;
+    }
+    scheduleIdleCheck(room, remaining > 0 ? remaining : roomIdleMs);
+  }
+
+  /** Cubeta de trazos o texto del jugador en esa sala (se crea al primer uso). */
+  function allowPlayerBucket(room: Room, playerId: string, bucket: PlayerBucket): boolean {
+    let limiter = room.limiters.get(playerId);
+    if (!limiter) {
+      limiter = new PlayerLimiter(now());
+      room.limiters.set(playerId, limiter);
+    }
+    return limiter.allow(bucket, now());
+  }
+
   function schedule(room: Room): void {
     if (room.timer) clearTimeout(room.timer);
     room.timer = null;
@@ -244,6 +341,10 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
       newId: () => randomBytes(6).toString('hex'),
     });
     room.state = result.state;
+    if (room.limiters.size > room.state.players.length) {
+      const present = new Set(room.state.players.map((p) => p.id));
+      for (const id of room.limiters.keys()) if (!present.has(id)) room.limiters.delete(id);
+    }
     for (const effect of result.effects) execute(room, result.state, effect);
     if (registry.get(room.code) === room) {
       if (room.state.players.length === 0) registry.delete(room);
@@ -303,6 +404,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
       ack({ ok: false, error: result.error ?? 'internal' });
       return;
     }
+    touch(room);
     session.roomCode = room.code;
     session.playerId = result.playerId;
     // Un socket está en una sola sala: se sale de la anterior solo después de entrar a la nueva.
@@ -330,8 +432,10 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
       roomCode: null,
       playerId: null,
       limiter: new SocketLimiter(now()),
+      ip: ipOf(socket),
     };
     sessions.set(socket.id, session);
+    ipLimiter.connected(session.ip);
     const loose = socket as unknown as LooseSocket;
 
     /** Evento con acuse (`room:create`, `room:join`): errores por ack, nunca por `system:error`. */
@@ -345,7 +449,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
         if (typeof rawAck !== 'function') return;
         const ack = (res: RoomAck): void => void (rawAck as (res: RoomAck) => void)(res);
         guard(socket, ack, () => {
-          if (!session.limiter.allow('control', now()))
+          if (!session.limiter.allow('entry', now()))
             return ack({ ok: false, error: 'rate_limited' });
           const parsed = schema.safeParse(args[0]);
           if (!parsed.success) return ack({ ok: false, error: 'invalid_payload' });
@@ -363,7 +467,13 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
     ): void {
       loose.on(event, (...args: unknown[]) => {
         guard(socket, null, () => {
-          if (!session.limiter.allow(bucket, now())) return sendError(socket, 'rate_limited');
+          // Trazos y texto se limitan por jugador de la sala; sin sala, por socket.
+          const who = bucket === 'stroke' || bucket === 'text' ? resolve(session) : null;
+          const allowed =
+            who && (bucket === 'stroke' || bucket === 'text')
+              ? allowPlayerBucket(who.room, who.player.id, bucket)
+              : session.limiter.allow(bucket, now());
+          if (!allowed) return sendError(socket, 'rate_limited');
           const parsed = schema.safeParse(args[0]);
           if (!parsed.success) return sendError(socket, 'invalid_payload');
           handler(parsed.data);
@@ -375,6 +485,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
     function act(build: (playerId: string) => Action): void {
       const who = resolve(session);
       if (!who) return sendError(socket, 'not_in_room');
+      touch(who.room);
       const result = run(who.room, build(who.player.id));
       if (result.error) sendError(socket, result.error);
     }
@@ -386,6 +497,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
     ): void {
       const who = resolve(session);
       if (!who) return sendError(socket, 'not_in_room');
+      touch(who.room);
       sync(who.room);
       const fresh = resolve(session);
       if (!fresh) return sendError(socket, 'not_in_room');
@@ -399,9 +511,14 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
     }
 
     onAcked('room:create', roomCreateSchema, (payload, ack) => {
+      if (!ipLimiter.allowRoomCreation(session.ip, now())) {
+        return ack({ ok: false, error: 'rate_limited' });
+      }
       const room = registry.create(createGame(engineConfig, {}));
       // No hay un código de error de "servidor lleno" en el contrato: se reutiliza `room_full`.
       if (!room) return ack({ ok: false, error: 'room_full' });
+      touch(room);
+      scheduleIdleCheck(room, roomIdleMs);
       enterRoom(session, room, payload, ack, true);
     });
 
@@ -465,6 +582,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
 
     socket.on('disconnect', () => {
       sessions.delete(socket.id);
+      ipLimiter.disconnected(session.ip);
       guard(socket, null, () => {
         const who = resolve(session);
         if (!who) return;

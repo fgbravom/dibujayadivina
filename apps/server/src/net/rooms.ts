@@ -2,6 +2,7 @@
 
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from '@dya/shared';
 import type { GameState } from '../game/index.js';
+import type { PlayerLimiter } from './rate-limit.js';
 import { StrokeHistory } from './strokes.js';
 import type { StrokeLimits } from './strokes.js';
 
@@ -11,6 +12,12 @@ export interface Room {
   /** Único temporizador de la sala: se reprograma tras cada `reduce` según `nextWakeAt`. */
   timer: ReturnType<typeof setTimeout> | null;
   strokes: StrokeHistory;
+  /** Instante de la última acción de un jugador; lo fija la red al crear la sala y en cada acción. */
+  lastActivity: number;
+  /** Temporizador del cierre por inactividad. */
+  idleTimer: ReturnType<typeof setTimeout> | null;
+  /** Cubetas de trazos y texto por jugador (`playerId`): cambiar de socket no las rellena. */
+  limiters: Map<string, PlayerLimiter>;
 }
 
 export class RoomRegistry {
@@ -42,15 +49,20 @@ export class RoomRegistry {
       state,
       timer: null,
       strokes: new StrokeHistory(this.strokeLimits),
+      lastActivity: 0,
+      idleTimer: null,
+      limiters: new Map(),
     };
     this.rooms.set(room.code, room);
     return room;
   }
 
-  /** Borra la sala y cancela su temporizador. */
+  /** Borra la sala y cancela sus temporizadores. */
   delete(room: Room): void {
     if (room.timer) clearTimeout(room.timer);
     room.timer = null;
+    if (room.idleTimer) clearTimeout(room.idleTimer);
+    room.idleTimer = null;
     if (this.rooms.get(room.code) === room) this.rooms.delete(room.code);
   }
 

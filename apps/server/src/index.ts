@@ -5,6 +5,10 @@
 //   HOST           interfaz de escucha (por defecto todas)
 //   WEB_DIR        carpeta del cliente compilado (por defecto apps/web/dist, si existe)
 //   DYA_MAX_ROOMS  tope de salas simultáneas (por defecto 500)
+//   CLIENT_IP_HEADER  cabecera con la IP real del cliente detrás de un proxy (p. ej. fly-client-ip);
+//                  sin ella no se confía en ninguna cabecera y se usa la IP de la conexión
+//   ALLOWED_ORIGINS  orígenes permitidos además del propio host, separados por coma (solo con
+//                  NODE_ENV=production, que rechaza los Origin que no coinciden con el Host)
 //
 // Modo de pruebas: solo se leen estas si DYA_TEST=1 (pruebas e2e deterministas)
 //   DYA_CHOOSE_MS    duración de elegir palabra, en ms
@@ -15,6 +19,9 @@
 
 import { createGameServer } from './net/index.js';
 import type { GameServerOptions } from './net/index.js';
+import { installGlobalErrorHandlers } from './process-errors.js';
+
+installGlobalErrorHandlers();
 
 function intEnv(name: string): number | undefined {
   const raw = process.env[name];
@@ -32,6 +39,12 @@ function readOptions(): GameServerOptions {
   if (process.env.WEB_DIR) options.webDir = process.env.WEB_DIR;
   const maxRooms = intEnv('DYA_MAX_ROOMS');
   if (maxRooms !== undefined) options.maxRooms = maxRooms;
+  if (process.env.CLIENT_IP_HEADER) options.clientIpHeader = process.env.CLIENT_IP_HEADER;
+  options.checkOrigin = process.env.NODE_ENV === 'production';
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',')
+    .map((o) => o.trim())
+    .filter((o) => o !== '');
+  if (allowedOrigins && allowedOrigins.length > 0) options.allowedOrigins = allowedOrigins;
 
   if (process.env.DYA_TEST === '1') {
     const chooseMs = intEnv('DYA_CHOOSE_MS');

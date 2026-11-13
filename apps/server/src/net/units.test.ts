@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_TEXT_MESSAGES_PER_SECOND } from '@dya/shared';
 import type { Stroke } from '@dya/shared';
-import { TokenBucket } from './rate-limit.js';
+import { IpLimiter, TokenBucket, clientIp } from './rate-limit.js';
 import { RoomRegistry } from './rooms.js';
-import { StrokeHistory } from './strokes.js';
+import { DEFAULT_STROKE_LIMITS, StrokeHistory } from './strokes.js';
 import { bankWordPicker, fixedWordPicker } from './words.js';
 import { createGame } from '../game/index.js';
 
@@ -50,7 +50,38 @@ describe('StrokeHistory', () => {
   });
 });
 
+describe('tope de puntos por turno', () => {
+  it('por defecto es de 30.000 puntos', () => {
+    expect(DEFAULT_STROKE_LIMITS.pointsPerTurn).toBe(30_000);
+    const h = new StrokeHistory();
+    const big = (id: string) =>
+      stroke(
+        id,
+        Array.from({ length: 10_000 }, () => 5),
+      ); // 5.000 puntos
+    for (let i = 0; i < 6; i++) expect(h.start(big(`b${i}`))).toBe('ok');
+    expect(h.start(big('b6'))).toBe('ignored');
+    expect(h.start(stroke('pequeno'))).toBe('ignored');
+  });
+});
+
 describe('TokenBucket', () => {
+  it('con capacidad y recarga propias: ráfaga de 3 y una ficha cada 2 s', () => {
+    const bucket = new TokenBucket(0.5, 0, 3);
+    expect([bucket.take(0), bucket.take(0), bucket.take(0), bucket.take(0)]).toEqual([
+      true,
+      true,
+      true,
+      false,
+    ]);
+    expect(bucket.take(1999)).toBe(false);
+    expect(bucket.take(2000)).toBe(true);
+    expect(bucket.take(2001)).toBe(false);
+    // Aunque pase mucho tiempo, no pasa de la capacidad.
+    const taken = Array.from({ length: 5 }, () => bucket.take(600_000)).filter(Boolean);
+    expect(taken).toHaveLength(3);
+  });
+
   it('deja pasar la ráfaga, corta el exceso y repone con el tiempo', () => {
     const bucket = new TokenBucket(MAX_TEXT_MESSAGES_PER_SECOND, 0);
     const allowed = Array.from({ length: 5 }, () => bucket.take(0)).filter(Boolean);
@@ -94,5 +125,57 @@ describe('selectores de palabras', () => {
   it('el del banco entrega n palabras distintas', () => {
     const picks = bankWordPicker(Math.random)([], 3);
     expect(new Set(picks.map((p) => p.text)).size).toBe(3);
+  });
+});
+
+describe('IpLimiter', () => {
+  it('limita las conexiones simultáneas por IP y las libera al cerrar', () => {
+    const limiter = new IpLimiter({ maxConnections: 2 });
+    expect(limiter.canConnect('1.1.1.1')).toBe(true);
+    limiter.connected('1.1.1.1');
+    limiter.connected('1.1.1.1');
+    expect(limiter.canConnect('1.1.1.1')).toBe(false);
+    expect(limiter.canConnect('2.2.2.2')).toBe(true);
+    limiter.disconnected('1.1.1.1');
+    expect(limiter.canConnect('1.1.1.1')).toBe(true);
+    limiter.disconnected('1.1.1.1');
+    expect(limiter.connectionCount('1.1.1.1')).toBe(0);
+  });
+
+  it('limita las salas creadas por ventana de tiempo y vuelve a permitir al pasar', () => {
+    const limiter = new IpLimiter({ maxRoomsPerWindow: 2, windowMs: 60_000 });
+    expect(limiter.allowRoomCreation('1.1.1.1', 0)).toBe(true);
+    expect(limiter.allowRoomCreation('1.1.1.1', 10_000)).toBe(true);
+    expect(limiter.allowRoomCreation('1.1.1.1', 59_999)).toBe(false);
+    expect(limiter.allowRoomCreation('2.2.2.2', 59_999)).toBe(true);
+    expect(limiter.allowRoomCreation('1.1.1.1', 60_001)).toBe(true); // venció la primera
+    expect(limiter.allowRoomCreation('1.1.1.1', 60_002)).toBe(false);
+  });
+
+  it('el valor por defecto es de 40 conexiones y 10 salas por minuto', () => {
+    const limiter = new IpLimiter();
+    for (let i = 0; i < 40; i++) limiter.connected('x');
+    expect(limiter.canConnect('x')).toBe(false);
+    const created = Array.from({ length: 12 }, () => limiter.allowRoomCreation('x', 0));
+    expect(created.filter(Boolean)).toHaveLength(10);
+  });
+});
+
+describe('clientIp', () => {
+  it('sin cabecera configurada ignora las cabeceras y usa la dirección de la conexión', () => {
+    expect(clientIp({ 'fly-client-ip': '9.9.9.9' }, '10.0.0.1', null)).toBe('10.0.0.1');
+    expect(clientIp({ 'x-forwarded-for': '9.9.9.9' }, undefined, null)).toBe('unknown');
+  });
+
+  it('con cabecera configurada la usa; si falta, vuelve a la conexión', () => {
+    expect(clientIp({ 'fly-client-ip': '9.9.9.9' }, '10.0.0.1', 'fly-client-ip')).toBe('9.9.9.9');
+    expect(clientIp({}, '10.0.0.1', 'fly-client-ip')).toBe('10.0.0.1');
+    expect(clientIp({ 'fly-client-ip': ' ' }, '10.0.0.1', 'fly-client-ip')).toBe('10.0.0.1');
+  });
+
+  it('con una lista separada por comas toma la última entrada', () => {
+    expect(clientIp({ 'x-forwarded-for': '6.6.6.6, 9.9.9.9' }, '10.0.0.1', 'x-forwarded-for')).toBe(
+      '9.9.9.9',
+    );
   });
 });
