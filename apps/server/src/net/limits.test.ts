@@ -177,7 +177,8 @@ describe('frecuencia de entrada y por jugador', () => {
       sessionId: lobby.sessionIds[0],
     });
     expect(res.ok).toBe(true);
-    second.emit('message:send', { text: 'ya?' });
+    // Tres seguidos caben en una cubeta recién llena, no en una que solo se recargó un instante.
+    for (let i = 0; i < 3; i++) second.emit('message:send', { text: `ya ${i}?` });
     const err = await second.waitFor<SystemErrorPayload>('system:error');
     expect(err.code).toBe('rate_limited');
   });
@@ -197,7 +198,9 @@ describe('frecuencia de entrada y por jugador', () => {
       sessionId: lobby.sessionIds[index],
     });
     expect(res.ok).toBe(true);
-    second.emit('stroke:start', stroke('nuevo'));
+    // Una ráfaga que una cubeta recién llena (30) dejaría pasar entera, pero no una vacía que
+    // solo se recargó durante el cambio de socket: así la prueba no depende de milisegundos.
+    for (let i = 0; i < 25; i++) second.emit('stroke:start', stroke(`n${i}`));
     const err = await second.waitFor<SystemErrorPayload>('system:error');
     expect(err.code).toBe('rate_limited');
   });
