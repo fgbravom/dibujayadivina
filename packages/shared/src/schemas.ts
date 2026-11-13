@@ -24,8 +24,15 @@ import type { Stroke } from './types.js';
 
 // Caracteres de control y de formato (incluye saltos de línea y marcas bidireccionales).
 const CONTROL_CHARS = /[\p{Cc}\p{Cf}]/u;
+// Rellenos que se ven en blanco pero no son espacios ni caracteres de control: Hangul Filler
+// (U+3164, U+115F, U+1160, U+FFA0) y el patrón braille vacío (U+2800).
+const INVISIBLE_FILLERS = /[\u3164\u115F\u1160\uFFA0\u2800]/u;
+const HAS_LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
 
-/** Apodo: se recortan los espacios de los bordes, los espacios dobles se colapsan y se prohíben los caracteres de control. */
+/**
+ * Apodo: se recortan los espacios de los bordes, los espacios dobles se colapsan, se prohíben los
+ * caracteres de control y los rellenos invisibles, y debe traer al menos una letra o un número.
+ */
 export const nicknameSchema = z
   .string()
   .max(NICKNAME_MAX_LENGTH * 4)
@@ -35,7 +42,8 @@ export const nicknameSchema = z
       .string()
       .min(NICKNAME_MIN_LENGTH)
       .max(NICKNAME_MAX_LENGTH)
-      .refine((s) => !CONTROL_CHARS.test(s)),
+      .refine((s) => !CONTROL_CHARS.test(s) && !INVISIBLE_FILLERS.test(s))
+      .refine((s) => HAS_LETTER_OR_DIGIT.test(s)),
   );
 
 export const sessionIdSchema = z
@@ -120,7 +128,7 @@ export type StrokeEndPayload = z.infer<typeof strokeEndSchema>;
 
 // --- message:send ---------------------------------------------------------
 
-/** Texto: se recorta, se colapsan los espacios, no puede quedar vacío ni pasar de 80 caracteres ni traer caracteres de control. */
+/** Texto: se recorta, se colapsan los espacios, no puede quedar vacío ni pasar de 80 caracteres ni traer caracteres de control o rellenos invisibles. */
 export const messageSendSchema = z.object({
   text: z
     .string()
@@ -131,7 +139,7 @@ export const messageSendSchema = z.object({
         .string()
         .min(1)
         .max(MESSAGE_MAX_LENGTH)
-        .refine((s) => !CONTROL_CHARS.test(s)),
+        .refine((s) => !CONTROL_CHARS.test(s) && !INVISIBLE_FILLERS.test(s)),
     ),
 });
 export type MessageSendPayload = z.infer<typeof messageSendSchema>;

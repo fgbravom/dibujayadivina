@@ -40,6 +40,26 @@ describe('room:create / room:join', () => {
     expect(roomCreateSchema.safeParse({ name: 'x'.repeat(16), sessionId }).success).toBe(true);
   });
 
+  it('exige al menos una letra o un número en el apodo', () => {
+    expect(roomCreateSchema.safeParse({ name: '!!', sessionId }).success).toBe(false);
+    expect(roomCreateSchema.safeParse({ name: '😀😀', sessionId }).success).toBe(false);
+    expect(roomCreateSchema.safeParse({ name: '-_-', sessionId }).success).toBe(false);
+    expect(roomCreateSchema.safeParse({ name: '😀a', sessionId }).success).toBe(true);
+    expect(roomCreateSchema.safeParse({ name: '😀7', sessionId }).success).toBe(true);
+    expect(roomCreateSchema.safeParse({ name: 'Ñandú', sessionId }).success).toBe(true);
+  });
+
+  it.each(['\u3164', '\u115F', '\u1160', '\uFFA0', '\u2800'])(
+    'rechaza el relleno invisible en apodos (%j)',
+    (filler) => {
+      expect(roomCreateSchema.safeParse({ name: filler + filler, sessionId }).success).toBe(false);
+      expect(roomCreateSchema.safeParse({ name: `Ana${filler}`, sessionId }).success).toBe(false);
+      expect(
+        roomJoinSchema.safeParse({ code: 'ABCD', name: `${filler}Ana`, sessionId }).success,
+      ).toBe(false);
+    },
+  );
+
   it('rechaza un sessionId inválido', () => {
     expect(roomCreateSchema.safeParse({ name: 'Ana', sessionId: 'corto' }).success).toBe(false);
     expect(roomCreateSchema.safeParse({ name: 'Ana', sessionId: 'con espacios!!' }).success).toBe(
@@ -113,6 +133,14 @@ describe('message:send', () => {
     expect(messageSendSchema.safeParse({ text: 'x'.repeat(80) }).success).toBe(true);
     expect(messageSendSchema.safeParse({ text: 42 }).success).toBe(false);
   });
+
+  it.each(['\u3164', '\u115F', '\u1160', '\uFFA0', '\u2800'])(
+    'rechaza el relleno invisible en los mensajes',
+    (filler) => {
+      expect(messageSendSchema.safeParse({ text: filler }).success).toBe(false);
+      expect(messageSendSchema.safeParse({ text: `hola${filler}mundo` }).success).toBe(false);
+    },
+  );
 });
 
 describe('eventos sin datos', () => {
