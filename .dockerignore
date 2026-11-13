@@ -1,0 +1,39 @@
+# Dependencias y salidas de compilación: se regeneran dentro de la imagen
+**/node_modules
+**/dist
+**/build
+**/coverage
+**/*.tsbuildinfo
+
+# Control de versiones y editor
+.git
+.gitattributes
+.gitignore
+.vscode
+.appmap
+
+# Documentos y plan: no hacen falta para compilar ni correr
+*.md
+docs
+
+# Pruebas (unitarias y e2e) y sus reportes
+**/*.test.ts
+**/*.test.tsx
+vitest.config.ts
+e2e
+playwright-report
+test-results
+
+# Herramientas de desarrollo
+.prettierrc.json
+.prettierignore
+eslint.config.js
+
+# Secretos y archivos locales
+.env
+.env.*
+**/*.log
+tmp
+Dockerfile
+.dockerignore
+fly.toml
