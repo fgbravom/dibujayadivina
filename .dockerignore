@@ -36,4 +36,3 @@ eslint.config.js
 tmp
 Dockerfile
 .dockerignore
-fly.toml
