@@ -62,7 +62,12 @@ export function startNextTurn(env: Env): void {
   s.deadline = env.ctx.now + s.config.chooseMs;
 
   env.fx.push({ type: 'strokes:reset' });
-  emit(env, toRoom, 'turn:choosing', { drawerId: candidate.id, endsAt: s.deadline });
+  emit(env, toRoom, 'turn:choosing', {
+    drawerId: candidate.id,
+    endsAt: s.deadline,
+    round: s.round,
+    totalRounds: s.settings.rounds,
+  });
   emit(env, toOne(candidate.id), 'turn:options', { words: options.map((o) => o.text) });
 }
 

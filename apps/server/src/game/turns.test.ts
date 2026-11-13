@@ -287,6 +287,31 @@ describe('fin de turno', () => {
     expect(emitsOf(fx, 'turn:choosing')).toHaveLength(1);
   });
 
+  it('turn:choosing trae la ronda: la nueva ronda se anuncia antes de turn:start', () => {
+    const h = drawingGame(['Ana', 'Beto']);
+    h.advanceTo(h.state.deadline!);
+    const mark = h.effects.length;
+    h.advanceBy(5_000);
+    expect(h.state.phase).toBe('CHOOSING');
+    expect(h.state.round).toBe(1);
+    expect(emitsOf(h.since(mark), 'turn:choosing')[0]?.payload).toMatchObject({
+      drawerId: 'p2',
+      round: 1,
+      totalRounds: 3,
+    });
+
+    chooseWord(h, 0);
+    h.advanceTo(h.state.deadline!);
+    const mark2 = h.effects.length;
+    h.advanceBy(5_000);
+    expect(h.state.round).toBe(2);
+    expect(emitsOf(h.since(mark2), 'turn:choosing')[0]?.payload).toMatchObject({
+      drawerId: 'p1',
+      round: 2,
+      totalRounds: 3,
+    });
+  });
+
   it('el turno que ya venció se cierra antes de evaluar la acción siguiente', () => {
     const h = drawingGame(['Ana', 'Beto']);
     h.now = h.state.deadline! + 1;

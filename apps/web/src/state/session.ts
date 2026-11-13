@@ -127,8 +127,9 @@ export function reduceSession(
           phase: 'CHOOSING',
           drawerId: event.payload.drawerId,
           endsAt: event.payload.endsAt,
-          // Al arrancar la partida no llega `turn:start` hasta que se elige la palabra.
-          round: Math.max(room.round, 1),
+          // La ronda llega ya al elegir palabra: sin esto la cabecera mostraría la anterior.
+          round: event.payload.round,
+          totalRounds: event.payload.totalRounds,
           mask: null,
           word: null,
           wordOptions: null,

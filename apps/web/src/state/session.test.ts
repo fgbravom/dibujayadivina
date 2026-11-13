@@ -133,7 +133,7 @@ describe('eventos del turno', () => {
   const choosing = (): SessionState =>
     run(withLobby({ players: [player('a', { isHost: true, guessed: true }), player('b')] }), {
       type: 'turn:choosing',
-      payload: { drawerId: 'a', endsAt: SERVER_NOW + 10_000 },
+      payload: { drawerId: 'a', endsAt: SERVER_NOW + 10_000, round: 1, totalRounds: 3 },
     });
 
   it('turn:choosing fija al dibujante y limpia palabra, máscara, aciertos y trazos', () => {
@@ -146,7 +146,10 @@ describe('eventos del turno', () => {
         strokes: [stroke],
         players: [player('a', { guessed: true }), player('b')],
       }),
-      { type: 'turn:choosing', payload: { drawerId: 'b', endsAt: 123 } },
+      {
+        type: 'turn:choosing',
+        payload: { drawerId: 'b', endsAt: 123, round: 3, totalRounds: 4 },
+      },
     );
     const room = roomOf(s);
     expect(room).toMatchObject({
@@ -158,13 +161,14 @@ describe('eventos del turno', () => {
       wordOptions: null,
       turnEnd: null,
       strokes: [],
-      round: 2,
+      round: 3,
+      totalRounds: 4,
     });
     expect(room.players.every((p) => !p.guessed)).toBe(true);
   });
 
-  it('turn:choosing al partir la partida pone la ronda en 1', () => {
-    expect(roomOf(choosing()).round).toBe(1);
+  it('turn:choosing al partir la partida trae la ronda 1 y el total', () => {
+    expect(roomOf(choosing())).toMatchObject({ round: 1, totalRounds: 3 });
   });
 
   it('turn:options guarda las opciones', () => {
@@ -280,7 +284,7 @@ describe('eventos del turno', () => {
     run(
       before,
       { type: 'player:joined', payload: player('c') },
-      { type: 'turn:choosing', payload: { drawerId: 'a', endsAt: 1 } },
+      { type: 'turn:choosing', payload: { drawerId: 'a', endsAt: 1, round: 1, totalRounds: 3 } },
       { type: 'guess:correct', payload: { playerId: 'a' } },
     );
     expect(JSON.stringify(before)).toBe(snapshot);
@@ -299,7 +303,10 @@ describe('un turno completo', () => {
     // El anfitrión inicia: los puntajes en 0 llegan como player:updated y arranca el primer turno.
     step(
       { type: 'player:updated', payload: player('a', { isHost: true }) },
-      { type: 'turn:choosing', payload: { drawerId: 'a', endsAt: SERVER_NOW + 10_000 } },
+      {
+        type: 'turn:choosing',
+        payload: { drawerId: 'a', endsAt: SERVER_NOW + 10_000, round: 1, totalRounds: 3 },
+      },
     );
     expect(roomOf(s).round).toBe(1);
 
@@ -335,7 +342,10 @@ describe('un turno completo', () => {
     expect(roomOf(s).turnEnd?.reason).toBe('time');
 
     // Siguiente turno: nadie ha adivinado, sin palabra ni máscara, pero el puntaje se conserva.
-    step({ type: 'turn:choosing', payload: { drawerId: 'b', endsAt: SERVER_NOW + 30_000 } });
+    step({
+      type: 'turn:choosing',
+      payload: { drawerId: 'b', endsAt: SERVER_NOW + 30_000, round: 1, totalRounds: 3 },
+    });
     expect(roomOf(s)).toMatchObject({ drawerId: 'b', mask: null, word: null, turnEnd: null });
     expect(roomOf(s).players.map((p) => [p.score, p.guessed])).toEqual([
       [10, false],
@@ -406,7 +416,10 @@ describe('canvasCommandFor', () => {
 
   it('turn:choosing vacía el lienzo y los eventos de trazo pasan al lienzo', () => {
     expect(
-      canvasCommandFor({ type: 'turn:choosing', payload: { drawerId: 'a', endsAt: 1 } }),
+      canvasCommandFor({
+        type: 'turn:choosing',
+        payload: { drawerId: 'a', endsAt: 1, round: 1, totalRounds: 3 },
+      }),
     ).toEqual({
       type: 'clear',
     });

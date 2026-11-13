@@ -96,7 +96,12 @@ describe('inicio', () => {
     expect(res.effects[0]).toEqual({ type: 'strokes:reset' });
     const [choosing] = emitsOf(res.effects, 'turn:choosing');
     expect(choosing?.to).toEqual({ kind: 'room' });
-    expect(choosing?.payload).toEqual({ drawerId: a, endsAt: h.now + 10_000 });
+    expect(choosing?.payload).toEqual({
+      drawerId: a,
+      endsAt: h.now + 10_000,
+      round: 1,
+      totalRounds: 3,
+    });
   });
 
   it('start fuera de LOBBY y GAME_END da wrong_phase', () => {

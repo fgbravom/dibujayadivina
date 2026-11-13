@@ -68,7 +68,12 @@ export type RoomAck = { ok: true; code: string; playerId: string } | AckError;
 
 // --- Payloads servidor -> cliente -----------------------------------------
 
-export type TurnChoosingPayload = { drawerId: string; endsAt: number };
+export type TurnChoosingPayload = {
+  drawerId: string;
+  endsAt: number;
+  round: number;
+  totalRounds: number;
+};
 export type TurnOptionsPayload = { words: string[] };
 export type TurnStartPayload = {
   drawerId: string;
