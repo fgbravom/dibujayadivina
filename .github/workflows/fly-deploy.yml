@@ -1,0 +1,41 @@
+# Verifica y despliega en Fly.io cada push a main. Guía en docs/despliegue.md.
+# Requiere el secreto FLY_API_TOKEN en el repositorio (fly tokens create deploy).
+name: Desplegar en Fly.io
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Un despliegue a la vez; uno nuevo espera a que termine el anterior en vez de cortarlo.
+concurrency:
+  group: fly-deploy
+  cancel-in-progress: false
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Toma la versión de pnpm del campo packageManager del package.json.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  desplegar:
+    needs: verificar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # --ha=false: una sola máquina, porque las salas viven en la memoria del proceso.
+      - run: flyctl deploy --remote-only --ha=false
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
