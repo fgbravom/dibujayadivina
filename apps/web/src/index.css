@@ -1,6 +1,17 @@
 @import 'tailwindcss';
 
 /*
+ * Variantes de distribución de la partida (se corresponden con LAND_QUERY y DESK_QUERY de
+ * ui/hooks/useMediaQuery.ts; si cambias una, cambia la otra):
+ *  - land: teléfono apaisado. Más ancho que alto (>= 3:2) y poco alto. Lienzo a la izquierda y
+ *    mensajes a la derecha.
+ *  - desk: escritorio. Tres columnas y barra de herramientas desplegada.
+ * Lo demás es teléfono vertical (o tableta vertical): todo apilado. land y desk son excluyentes.
+ */
+@custom-variant land (@media (min-aspect-ratio: 3/2) and (max-height: 500px));
+@custom-variant desk (@media (min-width: 1024px) and (min-height: 501px));
+
+/*
  * Identidad visual de "Dibuja y Adivina": papel de cuaderno, tinta azul marino y colores de
  * lápiz (copihue, sol, mar, pasto). Bordes gruesos y sombras duras, como un sticker pegado.
  * Todos los colores de texto sobre fondo cumplen contraste AA (>= 4.5:1).
@@ -96,6 +107,17 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    /* Sin zoom por doble toque (el zoom de pellizco sigue disponible) ni rebote al desplazar. */
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: color-mix(in srgb, var(--color-ink) 12%, transparent);
+  }
+
+  /* Durante la partida (GameScreen) la página no se desplaza ni rebota. */
+  html.game-lock,
+  html.game-lock body {
+    overflow: hidden;
+    overscroll-behavior: none;
   }
 
   body {
@@ -127,9 +149,20 @@
     font-size: 16px;
   }
 
+  /* Los campos de texto sí se pueden seleccionar (Safari no deja escribir si heredan `none`). */
+  input,
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* Mantener presionado un botón no selecciona texto ni abre el menú del navegador. */
   button {
     touch-action: manipulation;
     cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
 
   button:disabled {
@@ -149,6 +182,12 @@
 
 /* Zona del lienzo: el marco 4:3 se ajusta al espacio disponible sin desbordar. */
 @layer components {
+  /* Zonas seguras (viewport-fit=cover): el contenido no queda bajo la muesca ni la barra de inicio. */
+  .safe-pad {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+  }
+
   .canvas-area {
     container-type: size;
     display: grid;
@@ -158,16 +197,45 @@
     min-height: 0;
   }
 
+  /*
+   * El marco descuenta sus propios bordes (--bx / --by: suma de los dos lados) para que el lienzo
+   * de dentro sea exactamente 4:3 y llene el ancho. En vertical el marco no lleva borde propio
+   * (las líneas de arriba y abajo son sombras, que no ocupan sitio); apaisado y escritorio sí lo
+   * llevan por los cuatro lados.
+   */
   .canvas-frame {
+    --bx: 0px;
+    --by: 0px;
     position: relative;
-    width: min(100cqw, calc(100cqh * 4 / 3));
+    box-sizing: content-box;
+    width: min(calc(100cqw - var(--bx)), calc((100cqh - var(--by)) * 4 / 3));
     aspect-ratio: 4 / 3;
   }
 
-  @media (min-width: 1024px) {
+  /* Escritorio y apaisado: el lienzo llena el espacio que le deja la columna o la fila. */
+  @media (min-width: 1024px) and (min-height: 501px) {
     .canvas-area {
       aspect-ratio: auto;
       flex: 1 1 0;
+    }
+
+    .canvas-frame {
+      --bx: 4px;
+      --by: 4px;
+    }
+  }
+
+  @media (min-aspect-ratio: 3/2) and (max-height: 500px) {
+    .canvas-area {
+      aspect-ratio: auto;
+      flex: 1 1 0;
+      width: auto;
+      min-width: 0;
+    }
+
+    .canvas-frame {
+      --bx: 4px;
+      --by: 4px;
     }
   }
 }

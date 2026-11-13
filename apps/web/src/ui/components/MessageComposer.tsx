@@ -9,6 +9,8 @@ type MessageComposerProps = {
   onSend: (text: string) => void;
   /** Sin conexión: el campo se bloquea hasta reconectar. */
   disabled?: boolean;
+  /** Teclado del teléfono abierto: ya no hace falta dejar sitio para la barra de inicio de iOS. */
+  keyboardOpen?: boolean;
   className?: string;
 };
 
@@ -27,6 +29,7 @@ export function MessageComposer({
   mode,
   onSend,
   disabled = false,
+  keyboardOpen = false,
   className = '',
 }: MessageComposerProps) {
   const [value, setValue] = useState('');
@@ -50,7 +53,7 @@ export function MessageComposer({
       onSubmit={submit}
       data-testid="composer"
       data-mode={mode}
-      className={`flex shrink-0 items-center gap-2 border-t-2 border-ink px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] ${className}`}
+      className={`flex shrink-0 items-center gap-2 border-t-2 border-ink px-3 pt-2 ${keyboardOpen ? 'pb-2' : 'pb-[max(0.5rem,env(safe-area-inset-bottom))]'} ${className}`}
     >
       <label htmlFor={inputId} className="sr-only">
         {text.label}
@@ -67,6 +70,7 @@ export function MessageComposer({
           disabled={disabled}
           autoComplete="off"
           autoCorrect="off"
+          autoCapitalize={mode === 'chat' ? 'sentences' : 'off'}
           spellCheck={mode === 'chat'}
           enterKeyHint="send"
           className={`h-11 w-full rounded-xl border-2 bg-card px-3 pr-12 text-base disabled:bg-paper-deep ${MODE_STYLES[mode]}`}

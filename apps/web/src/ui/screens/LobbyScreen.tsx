@@ -71,7 +71,7 @@ export function LobbyScreen({
   const missing = MIN_PLAYERS_TO_START - room.players.length;
 
   return (
-    <div className="flex min-h-(--app-h) flex-col">
+    <div className="safe-pad flex min-h-(--app-h) flex-col">
       <ReconnectBanner connected={connected} />
       <main className="mx-auto grid w-full max-w-5xl flex-1 grid-cols-1 content-start gap-4 px-4 py-5 lg:grid-cols-2 lg:gap-6 lg:py-8">
         <div className="contents lg:flex lg:flex-col lg:gap-4">

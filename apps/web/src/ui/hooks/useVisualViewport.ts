@@ -8,7 +8,12 @@ export type ViewportInfo = {
   height: number | null;
   /** Hay poco alto disponible: conviene soltar adornos para que quepan el lienzo y el campo de texto. */
   compact: boolean;
+  /** El teclado del teléfono está abierto: el área visible es bastante menor que la ventana. */
+  keyboardOpen: boolean;
 };
+
+/** Diferencia (px) entre la ventana y el área visible desde la que se da por abierto el teclado. */
+const KEYBOARD_GAP_PX = 120;
 
 function subscribe(onChange: () => void): () => void {
   const vv = window.visualViewport;
@@ -60,5 +65,9 @@ export function useVisualViewport(): ViewportInfo {
   return {
     height,
     compact: effectiveHeight !== null && effectiveHeight < COMPACT_HEIGHT_PX,
+    keyboardOpen:
+      height !== null &&
+      typeof window !== 'undefined' &&
+      window.innerHeight - height > KEYBOARD_GAP_PX,
   };
 }

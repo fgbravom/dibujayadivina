@@ -12,7 +12,10 @@ type ChoosingPanelProps = {
   onChoose: (index: number) => void;
 };
 
-/** Fase CHOOSING, sobre el lienzo. */
+/**
+ * Fase CHOOSING, sobre el lienzo. El aviso para lectores de pantalla ("Fulano está eligiendo") lo
+ * da la región `aria-live` de `GameScreen`, así no se lee dos veces.
+ */
 export function ChoosingPanel({
   isDrawer,
   drawerId,
@@ -60,7 +63,6 @@ export function ChoosingPanel({
   return (
     <div
       data-testid="choosing-guesser"
-      role="status"
       className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center"
     >
       {drawerId && <Avatar id={drawerId} name={drawerName} />}

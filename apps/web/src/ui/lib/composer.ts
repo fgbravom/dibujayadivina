@@ -22,7 +22,7 @@ export function getComposerMode(input: {
 export const COMPOSER_TEXT: Record<ComposerMode, { placeholder: string; label: string }> = {
   guess: { placeholder: 'Escribe tu respuesta', label: 'Tu respuesta' },
   guessed: {
-    placeholder: 'Solo para quienes adivinaron',
+    placeholder: 'Solo adivinadores',
     label: 'Mensaje para quienes ya adivinaron',
   },
   chat: { placeholder: 'Escribe un mensaje', label: 'Mensaje de chat' },

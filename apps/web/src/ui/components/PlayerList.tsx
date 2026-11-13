@@ -81,7 +81,7 @@ export function PlayerList({
       <ul
         aria-label="Jugadores"
         data-testid="player-chips"
-        className={`relative flex gap-2 overflow-x-auto px-3 py-2 ${className}`}
+        className={`relative flex gap-2 overflow-x-auto px-3 py-1 ${className}`}
       >
         {ordered.map(({ player }) => {
           const status = statusOf(player, drawerId, phase);
@@ -94,7 +94,7 @@ export function PlayerList({
           return (
             <li
               key={player.id}
-              className={`flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border-2 border-ink py-1 pl-1.5 pr-2.5 ${highlight} ${player.connected ? '' : 'opacity-60'}`}
+              className={`flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl border-2 border-ink py-0.5 pl-1.5 pr-2.5 ${highlight} ${player.connected ? '' : 'opacity-60'}`}
             >
               <Avatar id={player.id} name={player.name} size="sm" />
               <span className="flex flex-col leading-tight">

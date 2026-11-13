@@ -34,9 +34,12 @@ function PodiumColumn({ place, selfId }: { place: PodiumPlace; selfId: string })
       {place.place === 1 && (
         <StarIcon className="size-8 text-sol" fill="currentColor" stroke="var(--color-ink)" />
       )}
-      <ul className="flex w-full flex-col items-center gap-1">
+      <ul className="flex w-full flex-wrap items-end justify-center gap-x-2 gap-y-1">
         {place.entries.map((entry) => (
-          <li key={entry.playerId} className="flex w-full min-w-0 flex-col items-center">
+          <li
+            key={entry.playerId}
+            className="flex min-w-0 max-w-full flex-1 basis-16 flex-col items-center"
+          >
             <Avatar id={entry.playerId} name={entry.name} />
             <span className="w-full truncate text-center text-sm font-extrabold sm:text-base">
               {entry.name}
@@ -70,7 +73,7 @@ export function GameEndScreen({
   const winners = ranking.filter((r) => r.rank === 1);
 
   return (
-    <div className="flex min-h-(--app-h) flex-col">
+    <div className="safe-pad flex min-h-(--app-h) flex-col">
       <ReconnectBanner connected={connected} />
       <main className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center gap-5 px-4 py-6">
         <header className="text-center">

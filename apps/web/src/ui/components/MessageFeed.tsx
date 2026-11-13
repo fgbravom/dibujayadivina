@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { avatarClass } from '../lib/avatar';
 import type { FeedItem, SystemTone } from '../types';
 import { ArrowDownIcon, CheckIcon } from './icons';
@@ -78,6 +78,18 @@ export function MessageFeed({ items, className = '' }: MessageFeedProps) {
     if (el && stickRef.current) el.scrollTop = el.scrollHeight;
   }, [items]);
 
+  // Si el espacio cambia (se abre el teclado, se gira el teléfono), quien iba al día sigue viendo el
+  // último mensaje en vez de quedarse con la lista a medio camino.
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      if (stickRef.current) el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const onScroll = () => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -103,8 +115,9 @@ export function MessageFeed({ items, className = '' }: MessageFeedProps) {
         aria-label="Mensajes"
         aria-live="polite"
         tabIndex={0}
+        data-selectable
         data-testid="message-feed"
-        className="absolute inset-0 overflow-y-auto overscroll-contain px-2 py-2"
+        className="absolute inset-0 select-text overflow-y-auto overscroll-contain px-2 py-2"
       >
         <ul className="flex flex-col gap-1.5">
           {items.length === 0 && (

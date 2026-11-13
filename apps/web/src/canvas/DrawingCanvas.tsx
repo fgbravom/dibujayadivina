@@ -284,13 +284,15 @@ export function DrawingCanvas({
           height: view.height,
           touchAction: 'none',
           WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
         onLostPointerCapture={handlePointerEnd}
-        onContextMenu={isDrawer ? (e) => e.preventDefault() : undefined}
+        // Sin menú al mantener presionado (guardar imagen, etc.), también para quien solo mira.
+        onContextMenu={(e) => e.preventDefault()}
       />
     </div>
   );
