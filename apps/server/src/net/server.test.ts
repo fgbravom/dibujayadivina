@@ -227,6 +227,76 @@ describe('trazos', () => {
   });
 });
 
+describe('rellenos (bote de pintura)', () => {
+  const fill = (id: string, color = '#e63946'): Stroke => ({
+    id,
+    color,
+    size: 8,
+    tool: 'fill',
+    points: [100, 100],
+  });
+
+  it('se reenvía a los demás, ignora puntos sueltos y llega en room:state en su orden', async () => {
+    const server = await startServer({ drawMs: 5000 });
+    const lobby = await createLobby(server, 3);
+    const { drawer, guessers } = await startDrawing(lobby);
+    const [g1, g2] = guessers;
+    if (!g1 || !g2) throw new Error('faltan adivinadores');
+
+    drawer.emit('stroke:start', stroke('s1'));
+    drawer.emit('stroke:end', { id: 's1' });
+    drawer.emit('stroke:start', fill('f1'));
+    // Puntos sobre el relleno: se descartan sin avisar ni reenviar.
+    drawer.emit('stroke:points', { id: 'f1', points: [5, 5] });
+    drawer.emit('stroke:end', { id: 'f1' });
+    // Un relleno con más de un punto no pasa el esquema.
+    drawer.emit('stroke:start', { ...fill('mal'), points: [1, 1, 2, 2] });
+    const err = await drawer.waitFor<SystemErrorPayload>('system:error');
+    expect(err.code).toBe('invalid_payload');
+    drawer.emit('stroke:start', stroke('s2'));
+
+    for (const g of [g1, g2]) {
+      expect(await g.waitFor<Stroke>('stroke:start', (s) => s.id === 'f1')).toEqual(fill('f1'));
+      await g.waitFor('stroke:end', (p: { id: string }) => p.id === 'f1');
+      await g.waitFor<Stroke>('stroke:start', (s) => s.id === 's2');
+      expect(g.received('stroke:points')).toHaveLength(0);
+      expect(g.received<Stroke>('stroke:start').map((s) => s.id)).toEqual(['s1', 'f1', 's2']);
+    }
+
+    const late = await connect(server);
+    const res = await late.ack('room:join', {
+      code: lobby.code,
+      name: 'Tarde',
+      sessionId: 'sesion-tardia-2',
+    });
+    expect(res.ok).toBe(true);
+    const state = await late.waitFor<RoomState>('room:state');
+    expect(state.strokes.map((s) => `${s.id}:${s.tool}`)).toEqual([
+      's1:brush',
+      'f1:fill',
+      's2:brush',
+    ]);
+    expect(state.strokes[1]?.points).toEqual([100, 100]);
+  });
+
+  it('respeta el tope de rellenos por turno y avisa al dibujante', async () => {
+    const server = await startServer({ drawMs: 5000, strokeLimits: { fillsPerTurn: 2 } });
+    const lobby = await createLobby(server, 2);
+    const { drawer, guessers } = await startDrawing(lobby);
+    const [guesser] = guessers;
+    if (!guesser) throw new Error('falta un adivinador');
+    drawer.emit('stroke:start', fill('a'));
+    drawer.emit('stroke:start', fill('b'));
+    drawer.emit('stroke:start', fill('c'));
+    const err = await drawer.waitFor<SystemErrorPayload>('system:error');
+    expect(err.code).toBe('too_many_strokes');
+    // Un pincel sigue entrando, y el tercer relleno nunca se reenvió.
+    drawer.emit('stroke:start', stroke('d'));
+    await guesser.waitFor<Stroke>('stroke:start', (s) => s.id === 'd');
+    expect(guesser.received<Stroke>('stroke:start').map((s) => s.id)).toEqual(['a', 'b', 'd']);
+  });
+});
+
 describe('reconexión y sesiones', () => {
   it('quien se reconecta con la misma sesión recibe puntajes y trazos del turno', async () => {
     const server = await startServer({ drawMs: 5000 });

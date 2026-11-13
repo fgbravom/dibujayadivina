@@ -1,11 +1,13 @@
 // Historial de trazos del turno en curso. Vive en la red, no en el motor (docs/motor-reglas.md sección 9).
 // Todo crecimiento tiene tope: trazos por turno, puntos por trazo y puntos por turno.
 
-import { MAX_STROKES_PER_TURN } from '@dya/shared';
+import { MAX_FILLS_PER_TURN, MAX_STROKES_PER_TURN } from '@dya/shared';
 import type { Stroke } from '@dya/shared';
 
 export interface StrokeLimits {
   strokesPerTurn: number;
+  /** Rellenos (bote de pintura) del turno; también cuentan para `strokesPerTurn`. */
+  fillsPerTurn: number;
   /** Puntos (pares x,y) que puede acumular un solo trazo. */
   pointsPerStroke: number;
   /** Puntos (pares x,y) en todo el historial del turno. */
@@ -14,6 +16,7 @@ export interface StrokeLimits {
 
 export const DEFAULT_STROKE_LIMITS: StrokeLimits = {
   strokesPerTurn: MAX_STROKES_PER_TURN,
+  fillsPerTurn: MAX_FILLS_PER_TURN,
   pointsPerStroke: 5_000,
   pointsPerTurn: 30_000,
 };
@@ -29,6 +32,7 @@ export class StrokeHistory {
   private byId = new Map<string, Stroke>();
   private open = new Set<string>();
   private pointCount = 0;
+  private fillCount = 0;
   private readonly limits: StrokeLimits;
 
   constructor(limits: Partial<StrokeLimits> = {}) {
@@ -43,6 +47,8 @@ export class StrokeHistory {
   start(stroke: Stroke): StrokeOutcome {
     if (this.byId.has(stroke.id)) return 'ignored';
     if (this.strokes.length >= this.limits.strokesPerTurn) return 'too_many_strokes';
+    const isFill = stroke.tool === 'fill';
+    if (isFill && this.fillCount >= this.limits.fillsPerTurn) return 'too_many_strokes';
     const added = stroke.points.length / 2;
     if (added > this.limits.pointsPerStroke) return 'ignored';
     if (this.pointCount + added > this.limits.pointsPerTurn) return 'ignored';
@@ -51,12 +57,14 @@ export class StrokeHistory {
     this.byId.set(copy.id, copy);
     this.open.add(copy.id);
     this.pointCount += added;
+    if (isFill) this.fillCount += 1;
     return 'ok';
   }
 
   addPoints(id: string, points: number[]): StrokeOutcome {
     const stroke = this.open.has(id) ? this.byId.get(id) : undefined;
-    if (!stroke) return 'ignored';
+    // Un relleno es un único punto: no admite más.
+    if (!stroke || stroke.tool === 'fill') return 'ignored';
     const added = points.length / 2;
     if (stroke.points.length / 2 + added > this.limits.pointsPerStroke) return 'ignored';
     if (this.pointCount + added > this.limits.pointsPerTurn) return 'ignored';
@@ -75,6 +83,7 @@ export class StrokeHistory {
     this.byId.delete(stroke.id);
     this.open.delete(stroke.id);
     this.pointCount -= stroke.points.length / 2;
+    if (stroke.tool === 'fill') this.fillCount -= 1;
     return 'ok';
   }
 
@@ -87,5 +96,6 @@ export class StrokeHistory {
     this.byId.clear();
     this.open.clear();
     this.pointCount = 0;
+    this.fillCount = 0;
   }
 }

@@ -105,6 +105,16 @@ describe('stroke:*', () => {
     expect(strokeStartSchema.safeParse({ ...stroke, tool: 'bucket' }).success).toBe(false);
   });
 
+  it('un relleno lleva exactamente un punto', () => {
+    const fill = { ...stroke, tool: 'fill', points: [400, 300] };
+    expect(strokeStartSchema.safeParse(fill).success).toBe(true);
+    expect(strokeStartSchema.safeParse({ ...fill, points: [] }).success).toBe(false);
+    expect(strokeStartSchema.safeParse({ ...fill, points: [1, 1, 2, 2] }).success).toBe(false);
+    expect(strokeStartSchema.safeParse({ ...fill, points: [801, 300] }).success).toBe(false);
+    // La regla es solo del relleno: un pincel sigue admitiendo varios puntos.
+    expect(strokeStartSchema.safeParse({ ...stroke, points: [1, 1, 2, 2] }).success).toBe(true);
+  });
+
   it('rechaza puntos impares, vacíos, fuera del lienzo o no enteros', () => {
     expect(strokePointsSchema.safeParse({ id: 's1', points: [1, 2, 3] }).success).toBe(false);
     expect(strokePointsSchema.safeParse({ id: 's1', points: [] }).success).toBe(false);

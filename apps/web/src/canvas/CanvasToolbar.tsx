@@ -111,6 +111,17 @@ function EraserIcon() {
   );
 }
 
+function BucketIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z" />
+      <path d="m5 2 5 5" />
+      <path d="M2 13h15" />
+      <path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z" />
+    </svg>
+  );
+}
+
 function UndoIcon() {
   return (
     <svg {...iconProps}>
@@ -165,7 +176,7 @@ function CheckMark({ color }: { color: string }) {
 /**
  * Barra de herramientas del dibujante. Es controlada: el estado de la herramienta vive en quien la
  * usa. En escritorio muestra todo desplegado; en teléfono es una sola fila (color, grosor, goma,
- * deshacer, limpiar) y la paleta y los grosores se abren en un panel sobre el lienzo.
+ * bote de pintura, deshacer, limpiar) y la paleta y los grosores se abren en un panel sobre el lienzo.
  */
 export function CanvasToolbar({
   tool,
@@ -177,6 +188,9 @@ export function CanvasToolbar({
 }: CanvasToolbarProps) {
   const unfolded = useMediaQuery(DESK_QUERY);
   const isEraser = tool.tool === 'eraser';
+  const isFill = tool.tool === 'fill';
+  /** Elegir un color no cambia de herramienta, salvo que fuera la goma: con el bote activo sigue el bote. */
+  const brushOrFill = isFill ? 'fill' : 'brush';
 
   const rootRef = useRef<HTMLDivElement>(null);
   const colorTriggerRef = useRef<HTMLButtonElement>(null);
@@ -237,7 +251,7 @@ export function CanvasToolbar({
   };
 
   const pickColor = (color: PaletteColor) => {
-    onToolChange({ ...tool, color, tool: 'brush' });
+    onToolChange({ ...tool, color, tool: brushOrFill });
     close(true);
   };
 
@@ -257,7 +271,7 @@ export function CanvasToolbar({
         aria-pressed={selected}
         disabled={disabled}
         onClick={() =>
-          unfolded ? onToolChange({ ...tool, color, tool: 'brush' }) : pickColor(color)
+          unfolded ? onToolChange({ ...tool, color, tool: brushOrFill }) : pickColor(color)
         }
         className={`${BUTTON_BASE} w-full ${selected ? 'ring-2 ring-ink ring-offset-2' : ''}`}
         style={{ backgroundColor: color }}
@@ -300,6 +314,20 @@ export function CanvasToolbar({
       className={unfolded ? '' : FOLDED_ITEM}
     >
       <EraserIcon />
+    </IconButton>
+  );
+  const fillButton = (
+    <IconButton
+      label="Bote de pintura"
+      selected={isFill}
+      disabled={disabled}
+      onClick={() => {
+        onToolChange({ ...tool, tool: isFill ? 'brush' : 'fill' });
+        setOpen(null);
+      }}
+      className={unfolded ? '' : FOLDED_ITEM}
+    >
+      <BucketIcon />
     </IconButton>
   );
   const undoButton = (
@@ -345,6 +373,7 @@ export function CanvasToolbar({
           </div>
           <span aria-hidden="true" className="mx-1 h-6 w-px bg-ink/30" />
           {eraserButton}
+          {fillButton}
           {undoButton}
           {clearButton}
         </div>
@@ -422,6 +451,7 @@ export function CanvasToolbar({
       </button>
 
       {eraserButton}
+      {fillButton}
       {undoButton}
       {clearButton}
 

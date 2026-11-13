@@ -139,6 +139,56 @@ describe('StrokeModel', () => {
   });
 });
 
+describe('StrokeModel con rellenos', () => {
+  const fill = (id: string, point = [100, 100]): Stroke => ({
+    ...stroke(id, point),
+    tool: 'fill',
+    color: '#e63946',
+  });
+
+  it('un relleno es un trazo más, en su orden, y se cierra con end', () => {
+    const model = new StrokeModel();
+    model.start(stroke('a', [0, 0, 5, 5]));
+    model.end('a');
+    expect(model.start(fill('f'))?.tool).toBe('fill');
+    expect(model.end('f')?.id).toBe('f');
+    model.start(stroke('b'));
+    expect(model.strokes.map((s) => `${s.id}:${s.tool}`)).toEqual(['a:brush', 'f:fill', 'b:brush']);
+    expect(model.strokes[1]?.points).toEqual([100, 100]);
+  });
+
+  it('ignora los puntos que llegan a un relleno', () => {
+    const model = new StrokeModel();
+    model.start(fill('f'));
+    expect(model.appendPoints('f', [5, 5])).toBeNull();
+    expect(model.strokes[0]?.points).toEqual([100, 100]);
+  });
+
+  it('deshacer un relleno lo quita y deja el trazo anterior', () => {
+    const model = new StrokeModel();
+    model.start(stroke('a'));
+    model.end('a');
+    model.start(fill('f'));
+    model.end('f');
+    expect(model.undo()?.tool).toBe('fill');
+    expect(model.strokes.map((s) => s.id)).toEqual(['a']);
+    expect(model.undo()?.id).toBe('a');
+  });
+
+  it('cargar un historial con rellenos los conserva y no admite puntos al último', () => {
+    const model = new StrokeModel();
+    model.load([stroke('a', [1, 1, 2, 2]), fill('f', [900, 700])]);
+    expect(model.strokes.map((s) => s.tool)).toEqual(['brush', 'fill']);
+    // El punto se recorta al lienzo como cualquier otro.
+    expect(model.strokes[1]?.points).toEqual([800, 600]);
+    // El último trazo es un relleno: no se "reabre" aunque lleguen puntos con su id.
+    expect(model.appendPoints('f', [5, 5])).toBeNull();
+    expect(model.strokes[1]?.points).toEqual([800, 600]);
+    expect(model.undo()?.id).toBe('f');
+    expect(model.strokes.map((s) => s.id)).toEqual(['a']);
+  });
+});
+
 describe('createStrokeId', () => {
   it('genera ids cortos, válidos para el contrato y únicos', () => {
     const ids = new Set<string>();

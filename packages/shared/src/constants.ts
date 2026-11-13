@@ -27,7 +27,11 @@ export type PaletteColor = (typeof PALETTE)[number];
 export const STROKE_SIZES = [4, 8, 16, 32] as const;
 export type StrokeSize = (typeof STROKE_SIZES)[number];
 
-export const STROKE_TOOLS = ['brush', 'eraser'] as const;
+/**
+ * Herramientas de trazo. `fill` (bote de pintura) es un trazo de un solo punto: el punto tocado, desde
+ * el que cada cliente rellena la zona del mismo color; `size` se ignora.
+ */
+export const STROKE_TOOLS = ['brush', 'eraser', 'fill'] as const;
 export type StrokeTool = (typeof STROKE_TOOLS)[number];
 
 export const DEFAULT_STROKE_COLOR: PaletteColor = '#000000';
@@ -49,6 +53,8 @@ export const MAX_POINTS_PER_MESSAGE = 64;
 export const MAX_STROKE_MESSAGES_PER_SECOND = 30;
 export const MAX_TEXT_MESSAGES_PER_SECOND = 3;
 export const MAX_STROKES_PER_TURN = 2000;
+/** Rellenos por turno (cuentan también para `MAX_STROKES_PER_TURN`): cada uno recorre píxeles. */
+export const MAX_FILLS_PER_TURN = 150;
 
 // --- Reglas del juego (valores por defecto, sección 2) --------------------
 

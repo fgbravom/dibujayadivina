@@ -17,7 +17,16 @@ import {
 } from 'react';
 import { clientToLogical, fitSize } from './geometry';
 import { StrokeEmitter } from './pointBatcher';
-import { paintAll, paintStrokeBody, paintStrokeTail, prepareContext } from './render';
+import {
+  BUFFER_HEIGHT,
+  BUFFER_WIDTH,
+  paintAll,
+  paintFill,
+  paintStrokeBody,
+  paintStrokeTail,
+  presentBuffer,
+  prepareContext,
+} from './render';
 import { createStrokeId } from './strokeId';
 import { StrokeModel } from './strokeModel';
 import type { DrawingCanvasMode, DrawingTool } from './types';
@@ -67,9 +76,26 @@ function useLatest<T>(value: T) {
   return ref;
 }
 
+/** Cursor del bote de pintura: el balde del botón, con la punta de vertido como punto activo. */
+const BUCKET_CURSOR = (() => {
+  const shapes =
+    '<path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/>' +
+    '<path d="m5 2 5 5"/><path d="M2 13h15"/>' +
+    '<path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/>';
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" ' +
+    'fill="none" stroke-linecap="round" stroke-linejoin="round">' +
+    `<g stroke="#fff" stroke-width="4.5">${shapes}</g><g stroke="#0f172a" stroke-width="2">${shapes}</g></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 4 19, copy`;
+})();
+
 /**
  * Lienzo 800 x 600 lógico, escalado al contenedor en 4:3. Si el contenedor tiene alto definido, el
  * lienzo se centra con letterbox; si no, ocupa el ancho completo. No conoce sockets.
+ *
+ * La imagen vive en un búfer fuera de pantalla de resolución fija (2x el espacio lógico): trazos y
+ * rellenos se pintan ahí, en orden, y el canvas visible solo lo copia a su tamaño. Así redimensionar
+ * o girar no repinta el historial, y el relleno por píxeles es igual en todas las pantallas.
  */
 export function DrawingCanvas({
   mode,
@@ -86,22 +112,75 @@ export function DrawingCanvas({
   const [model] = useState(() => new StrokeModel());
   const [view, setView] = useState<View>({ width: 0, height: 0, dpr: 1 });
   const activeRef = useRef<ActiveStroke | null>(null);
+  const bufferRef = useRef<HTMLCanvasElement | null>(null);
+  const frameRef = useRef(0);
 
   const toolRef = useLatest(tool);
   const callbacksRef = useLatest({ onStrokeStart, onStrokePoints, onStrokeEnd });
 
-  /** Ejecuta `paint` con el contexto listo (transformación lógica); no hace nada si aún no hay tamaño. */
-  const withContext = useCallback((paint: (ctx: CanvasRenderingContext2D) => void) => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx || canvas.width === 0 || canvas.height === 0) return;
-    prepareContext(ctx, canvas.width, canvas.height);
-    paint(ctx);
+  /** Búfer fuera de pantalla, creado la primera vez que hace falta. */
+  const getBuffer = useCallback(() => {
+    if (!bufferRef.current) {
+      const buffer = document.createElement('canvas');
+      buffer.width = BUFFER_WIDTH;
+      buffer.height = BUFFER_HEIGHT;
+      // willReadFrequently: el relleno lee y reescribe los píxeles; en memoria de CPU es mucho más rápido.
+      const ctx = buffer.getContext('2d', { willReadFrequently: true });
+      if (ctx) {
+        prepareContext(ctx, buffer.width, buffer.height);
+        paintAll(ctx, []);
+      }
+      bufferRef.current = buffer;
+    }
+    return bufferRef.current;
   }, []);
 
+  /** Copia el búfer al canvas visible (escalado). */
+  const present = useCallback(() => {
+    if (frameRef.current) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = 0;
+    }
+    const canvas = canvasRef.current;
+    if (canvas) presentBuffer(canvas, getBuffer());
+  }, [getBuffer]);
+
+  /** Como `present`, pero junta las llamadas de un mismo cuadro (trazo en curso, muchos eventos). */
+  const schedulePresent = useCallback(() => {
+    if (frameRef.current) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = 0;
+      present();
+    });
+  }, [present]);
+
+  /**
+   * Ejecuta `paint` sobre el búfer (coordenadas lógicas) y lo muestra. Por defecto la copia espera al
+   * siguiente cuadro; los cambios puntuales (cerrar trazo, relleno, deshacer, cargar) la hacen ya.
+   */
+  const withContext = useCallback(
+    (paint: (ctx: CanvasRenderingContext2D) => void, immediate = false) => {
+      const ctx = getBuffer().getContext('2d', { willReadFrequently: true });
+      if (!ctx) return;
+      paint(ctx);
+      if (immediate) present();
+      else schedulePresent();
+    },
+    [getBuffer, present, schedulePresent],
+  );
+
+  /** Reconstruye el búfer desde el modelo (deshacer, limpiar, cargar). */
   const repaint = useCallback(() => {
-    withContext((ctx) => paintAll(ctx, model.strokes, (id) => model.isOpen(id)));
+    withContext((ctx) => paintAll(ctx, model.strokes, (id) => model.isOpen(id)), true);
   }, [model, withContext]);
+
+  // Un cuadro pendiente no debe sobrevivir al lienzo.
+  useEffect(
+    () => () => {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+    },
+    [],
+  );
 
   // Mide el contenedor y calcula el tamaño 4:3 y la densidad de píxeles.
   useEffect(() => {
@@ -125,14 +204,14 @@ export function DrawingCanvas({
     };
   }, []);
 
-  // Al cambiar tamaño o densidad, el bitmap se reasigna (se borra) y se redibuja todo.
+  // Al cambiar tamaño o densidad, el bitmap visible se reasigna (se borra) y se vuelve a copiar el búfer.
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || view.width === 0) return;
     canvas.width = Math.round(view.width * view.dpr);
     canvas.height = Math.round(view.height * view.dpr);
-    repaint();
-  }, [view, repaint]);
+    present();
+  }, [view, present]);
 
   /** Cierra el trazo local en curso: vacía lo pendiente y emite `onStrokeEnd`. */
   const finishStroke = useCallback(() => {
@@ -141,7 +220,7 @@ export function DrawingCanvas({
     activeRef.current = null;
     active.emitter.stop();
     const closed = model.end(active.id);
-    if (closed) withContext((ctx) => paintStrokeTail(ctx, closed));
+    if (closed) withContext((ctx) => paintStrokeTail(ctx, closed), true);
     callbacksRef.current.onStrokeEnd?.({ id: active.id });
   }, [model, callbacksRef, withContext]);
 
@@ -156,7 +235,9 @@ export function DrawingCanvas({
     () => ({
       applyStrokeStart: (payload) => {
         const stroke = model.start(payload);
-        if (stroke) withContext((ctx) => paintStrokeBody(ctx, stroke));
+        if (!stroke) return;
+        if (stroke.tool === 'fill') withContext((ctx) => paintFill(ctx, stroke), true);
+        else withContext((ctx) => paintStrokeBody(ctx, stroke));
       },
       applyStrokePoints: (payload) => {
         const result = model.appendPoints(payload.id, payload.points);
@@ -169,7 +250,7 @@ export function DrawingCanvas({
       },
       applyStrokeEnd: (payload) => {
         const closed = model.end(payload.id);
-        if (closed) withContext((ctx) => paintStrokeTail(ctx, closed));
+        if (closed) withContext((ctx) => paintStrokeTail(ctx, closed), true);
       },
       undo: () => {
         finishStroke();
@@ -205,8 +286,27 @@ export function DrawingCanvas({
     const point = toLogical(e);
     if (!point) return;
 
-    e.currentTarget.setPointerCapture(e.pointerId);
     const current = toolRef.current;
+
+    if (current.tool === 'fill') {
+      // Un toque basta: el relleno es un trazo de un punto, que empieza y termina de inmediato.
+      const fill: StrokeStartPayload = {
+        id: createStrokeId(),
+        color: current.color,
+        size: current.size,
+        tool: 'fill',
+        points: [point[0], point[1]],
+      };
+      const started = model.start(fill);
+      if (!started) return;
+      model.end(fill.id);
+      withContext((ctx) => paintFill(ctx, started), true);
+      callbacksRef.current.onStrokeStart?.(fill);
+      callbacksRef.current.onStrokeEnd?.({ id: fill.id });
+      return;
+    }
+
+    e.currentTarget.setPointerCapture(e.pointerId);
     const isEraser = current.tool === 'eraser';
     const payload: StrokeStartPayload = {
       id: createStrokeId(),
@@ -265,6 +365,7 @@ export function DrawingCanvas({
   };
 
   const isDrawer = mode === 'drawer';
+  const isFill = isDrawer && tool.tool === 'fill';
 
   return (
     <div
@@ -276,12 +377,14 @@ export function DrawingCanvas({
         ref={canvasRef}
         role="img"
         aria-label={ariaLabel}
+        data-tool={isDrawer ? tool.tool : undefined}
         className={`block max-w-full bg-white shadow-sm ring-1 ring-slate-300 select-none ${
-          isDrawer ? 'cursor-crosshair' : ''
+          isDrawer && !isFill ? 'cursor-crosshair' : ''
         }`}
         style={{
           width: view.width,
           height: view.height,
+          cursor: isFill ? BUCKET_CURSOR : undefined,
           touchAction: 'none',
           WebkitTouchCallout: 'none',
           WebkitUserSelect: 'none',

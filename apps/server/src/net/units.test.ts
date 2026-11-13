@@ -50,6 +50,58 @@ describe('StrokeHistory', () => {
   });
 });
 
+describe('StrokeHistory con rellenos', () => {
+  const fill = (id: string): Stroke => ({ ...stroke(id, [100, 100]), tool: 'fill' });
+
+  it('guarda el relleno en su orden y se puede deshacer', () => {
+    const h = new StrokeHistory();
+    expect(h.start(stroke('a'))).toBe('ok');
+    expect(h.end('a')).toBe('ok');
+    expect(h.start(fill('f'))).toBe('ok');
+    expect(h.end('f')).toBe('ok');
+    expect(h.list.map((s) => `${s.id}:${s.tool}`)).toEqual(['a:brush', 'f:fill']);
+    expect(h.undo()).toBe('ok');
+    expect(h.list.map((s) => s.id)).toEqual(['a']);
+  });
+
+  it('ignora los puntos que llegan a un relleno', () => {
+    const h = new StrokeHistory();
+    expect(h.start(fill('f'))).toBe('ok');
+    expect(h.addPoints('f', [5, 5])).toBe('ignored');
+    expect(h.list[0]?.points).toEqual([100, 100]);
+  });
+
+  it('por defecto admite 150 rellenos por turno; el siguiente excede y no se guarda', () => {
+    expect(DEFAULT_STROKE_LIMITS.fillsPerTurn).toBe(150);
+    const h = new StrokeHistory();
+    for (let i = 0; i < 150; i++) expect(h.start(fill(`f${i}`))).toBe('ok');
+    expect(h.start(fill('extra'))).toBe('too_many_strokes');
+    expect(h.list).toHaveLength(150);
+    // Un pincel sí cabe: el tope de rellenos es aparte.
+    expect(h.start(stroke('pincel'))).toBe('ok');
+  });
+
+  it('deshacer y limpiar devuelven cupo de rellenos', () => {
+    const h = new StrokeHistory({ fillsPerTurn: 2 });
+    expect(h.start(fill('a'))).toBe('ok');
+    expect(h.start(fill('b'))).toBe('ok');
+    expect(h.start(fill('c'))).toBe('too_many_strokes');
+    h.undo();
+    expect(h.start(fill('c'))).toBe('ok');
+    h.clear();
+    expect(h.start(fill('d'))).toBe('ok');
+    expect(h.start(fill('e'))).toBe('ok');
+    expect(h.start(fill('f'))).toBe('too_many_strokes');
+  });
+
+  it('los rellenos cuentan para el tope general de trazos', () => {
+    const h = new StrokeHistory({ strokesPerTurn: 2 });
+    expect(h.start(fill('a'))).toBe('ok');
+    expect(h.start(stroke('b'))).toBe('ok');
+    expect(h.start(fill('c'))).toBe('too_many_strokes');
+  });
+});
+
 describe('tope de puntos por turno', () => {
   it('por defecto es de 30.000 puntos', () => {
     expect(DEFAULT_STROKE_LIMITS.pointsPerTurn).toBe(30_000);

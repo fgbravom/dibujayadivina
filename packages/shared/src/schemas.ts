@@ -106,13 +106,19 @@ export type WordChoosePayload = z.infer<typeof wordChooseSchema>;
 
 // --- stroke:* -------------------------------------------------------------
 
-export const strokeStartSchema = z.object({
-  id: strokeIdSchema,
-  color: z.enum(PALETTE),
-  size: z.union([z.literal(4), z.literal(8), z.literal(16), z.literal(32)]),
-  tool: z.enum(STROKE_TOOLS),
-  points: pointsSchema,
-}) satisfies z.ZodType<Stroke>;
+export const strokeStartSchema = z
+  .object({
+    id: strokeIdSchema,
+    color: z.enum(PALETTE),
+    size: z.union([z.literal(4), z.literal(8), z.literal(16), z.literal(32)]),
+    tool: z.enum(STROKE_TOOLS),
+    points: pointsSchema,
+  })
+  // Un relleno es exactamente el punto tocado.
+  .refine((s) => s.tool !== 'fill' || s.points.length === 2, {
+    message: 'a fill must have exactly one point',
+    path: ['points'],
+  }) satisfies z.ZodType<Stroke>;
 export type StrokeStartPayload = Stroke;
 
 export const strokePointsSchema = z.object({

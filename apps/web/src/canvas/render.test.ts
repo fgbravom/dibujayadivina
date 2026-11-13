@@ -1,6 +1,13 @@
 import type { Stroke } from '@dya/shared';
 import { describe, expect, it } from 'vitest';
-import { paintStroke, paintStrokeBody, paintStrokeTail } from './render';
+import {
+  BUFFER_HEIGHT,
+  BUFFER_WIDTH,
+  paintAll,
+  paintStroke,
+  paintStrokeBody,
+  paintStrokeTail,
+} from './render';
 
 /** Contexto falso que solo anota las operaciones de trayecto (sin DOM). */
 function recorder() {
@@ -75,5 +82,65 @@ describe('pintado de trazos', () => {
     paintStrokeTail(partial.ctx, growing);
 
     expect(curvesOf(partial.ops)).toEqual(curvesOf(full.ops));
+  });
+});
+
+describe('relleno en el búfer', () => {
+  const fill = (points: number[], color = '#e63946'): Stroke => ({
+    id: 'f',
+    color,
+    size: 8,
+    tool: 'fill',
+    points,
+  });
+
+  it('el búfer es de 1600 x 1200, el doble del espacio lógico', () => {
+    expect([BUFFER_WIDTH, BUFFER_HEIGHT]).toEqual([1600, 1200]);
+  });
+
+  it('un relleno no pinta círculo ni tramos: no emite operaciones de trazo', () => {
+    const { ops, ctx } = recorder();
+    paintStroke(ctx, fill([10, 20]));
+    expect(ops).toEqual([]);
+  });
+
+  it('paintAll aplica los rellenos en su orden sobre los píxeles y los comparte en una lectura', () => {
+    const width = 16;
+    const height = 12;
+    const pixels = new Uint8ClampedArray(width * height * 4);
+    const log: string[] = [];
+    const ctx = {
+      canvas: { width, height },
+      fillStyle: '',
+      fillRect: () => {
+        for (let i = 0; i < pixels.length; i += 4) pixels.set([255, 255, 255, 255], i);
+        log.push('background');
+      },
+      getImageData: () => {
+        log.push('get');
+        return { data: pixels.slice(), width, height } as unknown as ImageData;
+      },
+      putImageData: (image: ImageData) => {
+        pixels.set(image.data);
+        log.push('put');
+      },
+      beginPath: () => {},
+      moveTo: () => {},
+      lineTo: () => {},
+      quadraticCurveTo: () => {},
+      arc: () => log.push('dot'),
+      fill: () => {},
+      stroke: () => {},
+    } as unknown as CanvasRenderingContext2D;
+
+    paintAll(ctx, [
+      fill([4, 3]),
+      { ...fill([4, 3], '#2a9d8f'), id: 'g' },
+      { ...stroke([1, 1]), id: 'b' },
+    ]);
+    // Dos rellenos seguidos: una lectura y una escritura; el pincel posterior va después.
+    expect(log).toEqual(['background', 'get', 'put', 'dot']);
+    // Punto lógico (4, 3) -> píxel (0, 0) del búfer de prueba: queda el segundo relleno (verde).
+    expect([...pixels.slice(0, 3)]).toEqual([0x2a, 0x9d, 0x8f]);
   });
 });

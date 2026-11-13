@@ -113,6 +113,48 @@ export class Player {
     });
   }
 
+  /**
+   * Cuenta los píxeles del lienzo cercanos a `rgb` (cada canal a +-`tolerance`) dentro y fuera del
+   * rectángulo `rect` = [x0, y0, x1, y1] en fracciones del lienzo, y el área en píxeles del rectángulo.
+   */
+  async colorCounts(
+    rgb: readonly [number, number, number],
+    rect: readonly [number, number, number, number],
+    tolerance = 12,
+  ): Promise<{ inside: number; outside: number; area: number }> {
+    return this.page.locator('canvas').evaluate(
+      (canvas: HTMLCanvasElement, args) => {
+        const ctx = canvas.getContext('2d');
+        if (!ctx || canvas.width === 0 || canvas.height === 0) {
+          return { inside: 0, outside: 0, area: 0 };
+        }
+        const { width, height } = canvas;
+        const data = ctx.getImageData(0, 0, width, height).data;
+        const [fx0, fy0, fx1, fy1] = args.rect;
+        const x0 = Math.floor(fx0 * width);
+        const x1 = Math.ceil(fx1 * width);
+        const y0 = Math.floor(fy0 * height);
+        const y1 = Math.ceil(fy1 * height);
+        let inside = 0;
+        let outside = 0;
+        for (let y = 0; y < height; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            const i = (y * width + x) * 4;
+            const near =
+              Math.abs(data[i]! - args.rgb[0]) <= args.tolerance &&
+              Math.abs(data[i + 1]! - args.rgb[1]) <= args.tolerance &&
+              Math.abs(data[i + 2]! - args.rgb[2]) <= args.tolerance;
+            if (!near) continue;
+            if (x >= x0 && x < x1 && y >= y0 && y < y1) inside += 1;
+            else outside += 1;
+          }
+        }
+        return { inside, outside, area: (x1 - x0) * (y1 - y0) };
+      },
+      { rgb, rect, tolerance },
+    );
+  }
+
   /** Texto completo de lo que recibió del servidor, en minúsculas. */
   receivedText(): string {
     return this.received.join('\n').toLowerCase();
@@ -133,10 +175,64 @@ export class Player {
 
   /** Dibuja un trazo de ejemplo: con toques reales en el teléfono (Chromium) o con el mouse. */
   async scribble(variant: 0 | 1 = 0): Promise<void> {
+    await this.drawPath(SCRIBBLES[variant]!, 1);
+  }
+
+  /** Dibuja un rectángulo cerrado (fracciones del lienzo) con la herramienta y el color actuales. */
+  async drawBox(x0: number, y0: number, x1: number, y1: number): Promise<void> {
+    await this.drawPath(
+      [
+        [x0, y0],
+        [x1, y0],
+        [x1, y1],
+        [x0, y1],
+        [x0, y0],
+      ],
+      16,
+    );
+  }
+
+  /** Un toque (teléfono, Chromium) o clic en un punto del lienzo, en fracciones del lienzo. */
+  async tapCanvas(fx: number, fy: number): Promise<void> {
+    const box = await this.page.locator('canvas').boundingBox();
+    if (!box) throw new Error(`${this.name}: el lienzo no tiene caja`);
+    const p = { x: box.x + box.width * fx, y: box.y + box.height * fy };
+    if (this.isPhone && this.browserName === 'chromium') {
+      this.cdp ??= await this.context.newCDPSession(this.page);
+      await this.cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchStart',
+        touchPoints: [{ x: p.x, y: p.y, id: 1 }],
+      });
+      await this.cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      return;
+    }
+    await this.page.mouse.click(p.x, p.y);
+  }
+
+  /** Elige un color de la paleta por su nombre ("rojo"); en el teléfono abre antes el panel. */
+  async chooseColor(name: string): Promise<void> {
+    if (this.isPhone) await this.page.getByTestId('color-trigger').click();
+    await this.page.getByRole('button', { name: `Color ${name}`, exact: true }).click();
+  }
+
+  /** Activa una herramienta de la barra por su nombre ("Bote de pintura", "Goma"). */
+  async chooseTool(name: string): Promise<void> {
+    await this.page.getByRole('button', { name, exact: true }).click();
+  }
+
+  async undo(): Promise<void> {
+    await this.page.getByRole('button', { name: 'Deshacer', exact: true }).click();
+  }
+
+  /** Traza una polilínea (fracciones del lienzo): con toques reales en el teléfono o con el mouse. */
+  private async drawPath(
+    path: ReadonlyArray<readonly [number, number]>,
+    touchSteps: number,
+  ): Promise<void> {
     const canvas = this.page.locator('canvas');
     const box = await canvas.boundingBox();
     if (!box) throw new Error(`${this.name}: el lienzo no tiene caja`);
-    const points = SCRIBBLES[variant]!.map(([fx, fy]) => ({
+    const points = path.map(([fx, fy]) => ({
       x: box.x + box.width * fx,
       y: box.y + box.height * fy,
     }));
@@ -149,9 +245,18 @@ export class Player {
           touchPoints: p ? [{ x: p.x, y: p.y, id: 1 }] : [],
         });
       await touch('touchStart', first);
-      for (const p of points.slice(1)) {
-        await touch('touchMove', p);
-        await this.page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+      // Con `touchSteps` > 1 cada tramo se recorre en pasos: sin ellos las esquinas salen redondeadas.
+      let from = first;
+      for (const to of points.slice(1)) {
+        for (let k = 1; k <= touchSteps; k += 1) {
+          const f = k / touchSteps;
+          await touch('touchMove', {
+            x: from.x + (to.x - from.x) * f,
+            y: from.y + (to.y - from.y) * f,
+          });
+          await this.page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+        }
+        from = to;
       }
       await touch('touchEnd');
       return;

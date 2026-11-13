@@ -47,8 +47,10 @@ export class StrokeModel {
     return copy;
   }
 
-  /** Agrega puntos a un trazo abierto. Devuelve null si no existe o ya se cerró. */
+  /** Agrega puntos a un trazo abierto. Devuelve null si no existe, ya se cerró o es un relleno. */
   appendPoints(id: string, points: readonly number[]): AppendResult | null {
+    // Un relleno es un solo punto: ignora lo que llegue después, sin tocar el estado de apertura.
+    if (this.find(id)?.tool === 'fill') return null;
     let reopened = false;
     if (!this.open.has(id)) {
       if (this.reopenable !== id) return null;
