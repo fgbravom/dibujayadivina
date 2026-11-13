@@ -31,59 +31,74 @@ apps/server/src/game/
 ## 3. Tipos
 
 ```ts
-import type { ErrorCode, GameSettings, Phase, Player, RankingEntry, RoomState,
-  ServerToClientEvents, TurnEndReason } from '@dya/shared';
+import type {
+  ErrorCode,
+  GameSettings,
+  Phase,
+  Player,
+  RankingEntry,
+  RoomState,
+  ServerToClientEvents,
+  TurnEndReason,
+} from '@dya/shared';
 
 export type PlayerId = string;
-export interface WordEntry { text: string; accept?: string[] } // subconjunto del tipo de words/
+export interface WordEntry {
+  text: string;
+  accept?: string[];
+} // subconjunto del tipo de words/
 
-export interface EngineConfig {       // valores por defecto desde las constantes de @dya/shared
-  minPlayers: number;                 // MIN_PLAYERS_TO_START
-  maxPlayers: number;                 // MAX_PLAYERS
-  optionsCount: number;               // WORD_OPTIONS_COUNT
-  chooseMs: number;                   // CHOOSE_SECONDS * 1000
-  shortenToMs: number;                // AFTER_FIRST_GUESS_SECONDS * 1000
-  turnEndMs: number;                  // TURN_END_SECONDS * 1000
-  graceMs: number;                    // RECONNECT_GRACE_SECONDS * 1000
-  hintFractions: readonly number[];   // HINT_TIME_FRACTIONS
-  drawMsOverride?: number;            // solo pruebas e2e: reemplaza settings.drawSeconds * 1000
+export interface EngineConfig {
+  // valores por defecto desde las constantes de @dya/shared
+  minPlayers: number; // MIN_PLAYERS_TO_START
+  maxPlayers: number; // MAX_PLAYERS
+  optionsCount: number; // WORD_OPTIONS_COUNT
+  chooseMs: number; // CHOOSE_SECONDS * 1000
+  shortenToMs: number; // AFTER_FIRST_GUESS_SECONDS * 1000
+  turnEndMs: number; // TURN_END_SECONDS * 1000
+  graceMs: number; // RECONNECT_GRACE_SECONDS * 1000
+  hintFractions: readonly number[]; // HINT_TIME_FRACTIONS
+  drawMsOverride?: number; // solo pruebas e2e: reemplaza settings.drawSeconds * 1000
 }
 
 export interface EnginePlayer {
   id: PlayerId;
-  sessionId: string;                  // secreto
+  sessionId: string; // secreto
   name: string;
   score: number;
   connected: boolean;
-  connId: string | null;              // socket actual
-  disconnectedAt: number | null;      // inicio de la gracia
+  connId: string | null; // socket actual
+  disconnectedAt: number | null; // inicio de la gracia
 }
 
-export interface Guess { playerId: PlayerId; points: number } // en orden de acierto
+export interface Guess {
+  playerId: PlayerId;
+  points: number;
+} // en orden de acierto
 
 export interface TurnState {
   drawerId: PlayerId;
   options: WordEntry[];
-  word: WordEntry | null;             // definida desde DRAWING
-  answers: string[];                  // normalizeGuess de text y de cada accept
-  revealed: number[];                 // índices revelados, según getMaskableIndices
-  pendingHints: number[];             // instantes absolutos ascendentes, todos < deadline
+  word: WordEntry | null; // definida desde DRAWING
+  answers: string[]; // normalizeGuess de text y de cada accept
+  revealed: number[]; // índices revelados, según getMaskableIndices
+  pendingHints: number[]; // instantes absolutos ascendentes, todos < deadline
   guesses: Guess[];
-  result: TurnEnd | null;             // tipo TurnEnd de @dya/shared; se fija al entrar en TURN_END
+  result: TurnEnd | null; // tipo TurnEnd de @dya/shared; se fija al entrar en TURN_END
 }
 
 export interface GameState {
   phase: Phase;
   config: EngineConfig;
   settings: GameSettings;
-  players: EnginePlayer[];            // orden del arreglo = orden de llegada
+  players: EnginePlayer[]; // orden del arreglo = orden de llegada
   hostId: PlayerId | null;
-  round: number;                      // 0 en LOBBY
+  round: number; // 0 en LOBBY
   drawnThisRound: PlayerId[];
-  usedWords: string[];                // textos de todas las opciones ofrecidas en la partida
-  turn: TurnState | null;             // solo en CHOOSING, DRAWING y TURN_END
-  deadline: number | null;            // fin de CHOOSING, DRAWING o TURN_END; null en LOBBY y GAME_END
-  ranking: RankingEntry[] | null;     // solo en GAME_END
+  usedWords: string[]; // textos de todas las opciones ofrecidas en la partida
+  turn: TurnState | null; // solo en CHOOSING, DRAWING y TURN_END
+  deadline: number | null; // fin de CHOOSING, DRAWING o TURN_END; null en LOBBY y GAME_END
+  ranking: RankingEntry[] | null; // solo en GAME_END
 }
 
 export interface EngineContext {
@@ -96,7 +111,7 @@ export interface EngineContext {
 export type Action =
   | { type: 'join'; sessionId: string; name: string; connId: string } // también reconexión y otra pestaña
   | { type: 'disconnect'; playerId: PlayerId; connId: string }
-  | { type: 'leave'; playerId: PlayerId }                             // borrado inmediato
+  | { type: 'leave'; playerId: PlayerId } // borrado inmediato
   | { type: 'updateSettings'; playerId: PlayerId; rounds: number; drawSeconds: number }
   | { type: 'start'; playerId: PlayerId }
   | { type: 'chooseWord'; playerId: PlayerId; index: number }
@@ -107,27 +122,44 @@ export type Recipient =
   | { kind: 'room' }
   | { kind: 'player'; playerId: PlayerId }
   | { kind: 'roomExcept'; playerId: PlayerId }
-  | { kind: 'players'; playerIds: PlayerId[] };   // canal "guessed", resuelto al reducir
+  | { kind: 'players'; playerIds: PlayerId[] }; // canal "guessed", resuelto al reducir
 
 export type EngineEvent =
-  | 'player:joined' | 'player:left' | 'player:updated'
-  | 'turn:choosing' | 'turn:options' | 'turn:start' | 'turn:word' | 'turn:hint'
-  | 'turn:timer' | 'turn:end' | 'game:end' | 'message:new' | 'guess:correct' | 'guess:close';
+  | 'player:joined'
+  | 'player:left'
+  | 'player:updated'
+  | 'turn:choosing'
+  | 'turn:options'
+  | 'turn:start'
+  | 'turn:word'
+  | 'turn:hint'
+  | 'turn:timer'
+  | 'turn:end'
+  | 'game:end'
+  | 'message:new'
+  | 'guess:correct'
+  | 'guess:close';
 
 export type EngineSnapshot = Omit<RoomState, 'code' | 'strokes'>; // la red agrega code y strokes
 
 export type Effect =
-  | { [E in EngineEvent]: { type: 'emit'; to: Recipient; event: E;
-        payload: Parameters<ServerToClientEvents[E]>[0] } }[EngineEvent]
+  | {
+      [E in EngineEvent]: {
+        type: 'emit';
+        to: Recipient;
+        event: E;
+        payload: Parameters<ServerToClientEvents[E]>[0];
+      };
+    }[EngineEvent]
   | { type: 'snapshot'; playerId: PlayerId; snapshot: EngineSnapshot } // la red envía room:state
-  | { type: 'strokes:reset' }                                          // la red vacía su historial
-  | { type: 'disconnectConn'; connId: string };                        // la red cierra el socket viejo
+  | { type: 'strokes:reset' } // la red vacía su historial
+  | { type: 'disconnectConn'; connId: string }; // la red cierra el socket viejo
 
 export interface ReduceResult {
   state: GameState;
-  effects: Effect[];        // en orden causal
-  error?: ErrorCode;        // con error, el estado solo refleja advance() y no hay efectos de la acción
-  playerId?: PlayerId;      // en un join exitoso
+  effects: Effect[]; // en orden causal
+  error?: ErrorCode; // con error, el estado solo refleja advance() y no hay efectos de la acción
+  playerId?: PlayerId; // en un join exitoso
 }
 ```
 
@@ -153,13 +185,13 @@ El estado expone vencimientos absolutos y la red mantiene un único temporizador
 
 Toda acción ejecuta primero `advance`: mientras el vencimiento más temprano sea `<= now`, lo procesa (tope de 50 vueltas; superarlo lanza error). En empate: gracia, luego pista, luego `deadline`. Las fases nuevas calculan su `deadline` desde `ctx.now`.
 
-| Vencimiento | Qué hace |
-|---|---|
-| Gracia de un jugador | `removePlayer` |
+| Vencimiento            | Qué hace                   |
+| ---------------------- | -------------------------- |
+| Gracia de un jugador   | `removePlayer`             |
 | `deadline` de CHOOSING | `beginDrawing(options[0])` |
-| Pista | `revealHint` |
-| `deadline` de DRAWING | `endTurn('timeout')` |
-| `deadline` de TURN_END | `startNextTurn` |
+| Pista                  | `revealHint`               |
+| `deadline` de DRAWING  | `endTurn('timeout')`       |
+| `deadline` de TURN_END | `startNextTurn`            |
 
 Consecuencia: un intento o un `chooseWord` que llega después de su plazo se evalúa contra la fase nueva (chat de TURN_END, o `wrong_phase`).
 
@@ -170,6 +202,7 @@ Consecuencia: un intento o un `chooseWord` que llega después de su plazo se eva
 ## 5. Rutinas
 
 **`startNextTurn`**
+
 1. Candidato: el primer jugador, en orden de llegada, conectado y que no esté en `drawnThisRound`.
 2. Si no hay: si `round < settings.rounds`, `round++`, se vacía `drawnThisRound` y se reintenta una vez. Si sigue sin haber, o era la última ronda, `endGame`.
 3. `options = pickWords(usedWords, optionsCount)` (vacío lanza error); sus textos se agregan a `usedWords`; el candidato se agrega a `drawnThisRound`; fase CHOOSING con `deadline = now + chooseMs`.
@@ -186,6 +219,7 @@ Consecuencia: un intento o un `chooseWord` que llega después de su plazo se eva
 **`checkAllGuessed`**: en DRAWING, si hay al menos un acierto y todo jugador conectado que no dibuja ya acertó, `endTurn('allGuessed')`.
 
 **`removePlayer(id)`**
+
 1. Lo quita y emite `player:left`.
 2. Si era anfitrión, el rol pasa al conectado más antiguo (si no hay, al más antiguo) y se emite `player:updated` del nuevo.
 3. Si la fase es CHOOSING, DRAWING o TURN_END y quedan menos de `minPlayers` jugadores (contando los que están en gracia): `toLobby` y termina.
@@ -193,19 +227,19 @@ Consecuencia: un intento o un `chooseWord` que llega después de su plazo se eva
 
 ## 6. Acciones
 
-| Acción | Fase | Guardas | Resultado |
-|---|---|---|---|
-| `join`, sesión nueva | cualquiera | sala llena: `room_full` | Crea el jugador (`newId`, `uniqueName`, 0 puntos). Si no hay anfitrión, lo es. `player:joined` al resto y `snapshot` al nuevo. En DRAWING puede adivinar de inmediato. |
-| `join`, sesión existente | cualquiera | ninguna | Si estaba conectado con otro `connId`: `disconnectConn` del viejo. Queda conectado con el `connId` nuevo. Si estaba desconectado: `player:updated` al resto. Siempre `snapshot`. No cambia el nombre. |
-| `disconnect` | cualquiera | `connId` distinto o ya desconectado: no hace nada | Marca desconectado e inicia la gracia. `player:updated`. Dibujante en CHOOSING: `startNextTurn`. Dibujante en DRAWING: `endTurn('drawerLeft')`. Adivinador en DRAWING: `checkAllGuessed`. No transfiere el anfitrión. |
-| `leave` | cualquiera | no existe: `not_in_room` | `removePlayer` |
-| `updateSettings` | LOBBY | `not_host`, `wrong_phase`, `invalid_payload` | Actualiza y manda `snapshot` a cada conectado. |
-| `start` | LOBBY | `not_host`, `wrong_phase`, menos de `minPlayers` conectados: `not_enough_players` | Puntajes a 0 (con `player:updated` de quien cambió), `round = 1`, `usedWords = []`, y `startNextTurn`. |
-| `start` | GAME_END | `not_host` | `toLobby` ("jugar de nuevo" vuelve a la sala de espera). |
-| `chooseWord` | CHOOSING | `wrong_phase`, `not_drawer`, `invalid_payload` | `beginDrawing(options[index])` |
-| `message` | no DRAWING | no existe: `not_in_room` | `message:new` canal `all` a la sala. |
-| `message` | DRAWING | igual | Ver abajo. |
-| `tick` | cualquiera | ninguna | Solo `advance`. |
+| Acción                   | Fase       | Guardas                                                                           | Resultado                                                                                                                                                                                                             |
+| ------------------------ | ---------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `join`, sesión nueva     | cualquiera | sala llena: `room_full`                                                           | Crea el jugador (`newId`, `uniqueName`, 0 puntos). Si no hay anfitrión, lo es. `player:joined` al resto y `snapshot` al nuevo. En DRAWING puede adivinar de inmediato.                                                |
+| `join`, sesión existente | cualquiera | ninguna                                                                           | Si estaba conectado con otro `connId`: `disconnectConn` del viejo. Queda conectado con el `connId` nuevo. Si estaba desconectado: `player:updated` al resto. Siempre `snapshot`. No cambia el nombre.                 |
+| `disconnect`             | cualquiera | `connId` distinto o ya desconectado: no hace nada                                 | Marca desconectado e inicia la gracia. `player:updated`. Dibujante en CHOOSING: `startNextTurn`. Dibujante en DRAWING: `endTurn('drawerLeft')`. Adivinador en DRAWING: `checkAllGuessed`. No transfiere el anfitrión. |
+| `leave`                  | cualquiera | no existe: `not_in_room`                                                          | `removePlayer`                                                                                                                                                                                                        |
+| `updateSettings`         | LOBBY      | `not_host`, `wrong_phase`, `invalid_payload`                                      | Actualiza y manda `snapshot` a cada conectado.                                                                                                                                                                        |
+| `start`                  | LOBBY      | `not_host`, `wrong_phase`, menos de `minPlayers` conectados: `not_enough_players` | Puntajes a 0 (con `player:updated` de quien cambió), `round = 1`, `usedWords = []`, y `startNextTurn`.                                                                                                                |
+| `start`                  | GAME_END   | `not_host`                                                                        | `toLobby` ("jugar de nuevo" vuelve a la sala de espera).                                                                                                                                                              |
+| `chooseWord`             | CHOOSING   | `wrong_phase`, `not_drawer`, `invalid_payload`                                    | `beginDrawing(options[index])`                                                                                                                                                                                        |
+| `message`                | no DRAWING | no existe: `not_in_room`                                                          | `message:new` canal `all` a la sala.                                                                                                                                                                                  |
+| `message`                | DRAWING    | igual                                                                             | Ver abajo.                                                                                                                                                                                                            |
+| `tick`                   | cualquiera | ninguna                                                                           | Solo `advance`.                                                                                                                                                                                                       |
 
 El texto del mensaje llega ya saneado por la red; si queda vacío tras `trim`, no hay efectos ni error.
 
@@ -228,22 +262,22 @@ El texto del mensaje llega ya saneado por la red; si queda vacío tras `trim`, n
 
 ## 8. Decisiones sobre casos borde
 
-| Caso | Decisión |
-|---|---|
-| Dibujante se desconecta en CHOOSING | Se salta su turno al instante, sin TURN_END. Queda gastado en la ronda. |
-| Dibujante se desconecta en DRAWING | Fin de turno inmediato con `drawerLeft`; nadie puntúa. Recargar la página le cuesta el turno. |
+| Caso                                    | Decisión                                                                                                                         |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Dibujante se desconecta en CHOOSING     | Se salta su turno al instante, sin TURN_END. Queda gastado en la ronda.                                                          |
+| Dibujante se desconecta en DRAWING      | Fin de turno inmediato con `drawerLeft`; nadie puntúa. Recargar la página le cuesta el turno.                                    |
 | Menos de 2 jugadores a mitad de partida | Vuelta a LOBBY cuando una salida o una gracia vencida deja menos de 2 presentes. Los que están en gracia cuentan como presentes. |
-| Le toca dibujar a alguien en gracia | No se elige ni se marca. Si vuelve antes de agotarse la ronda, dibuja después. |
-| Entra tarde | Adivina de inmediato y, al quedar al final del orden, dibuja al final de la ronda en curso. |
-| Todos acertaron | Cuentan solo los conectados, con al menos un acierto. Se revisa también cuando se va un adivinador. |
-| El anfitrión se va | El rol se transfiere al borrarse el jugador, no al desconectarse. |
-| Quien ya acertó escribe la palabra | Se permite; solo lo ven quienes ya la conocen. |
-| Empate | Comparten puesto. |
-| Misma sesión en otra pestaña | Gana la última; el `disconnect` del socket viejo se ignora por `connId`. |
-| Gracia vencida | Se borra. Si vuelve, entra como jugador nuevo. |
-| GAME_END | No tiene plazo. Sale con `start` del anfitrión, que lleva a LOBBY. Si el anfitrión se va, el rol se transfiere como siempre. |
-| Chat en CHOOSING | Chat normal para todos, incluido el dibujante. |
-| Quién dibuja primero | Orden de llegada, sin azar. |
+| Le toca dibujar a alguien en gracia     | No se elige ni se marca. Si vuelve antes de agotarse la ronda, dibuja después.                                                   |
+| Entra tarde                             | Adivina de inmediato y, al quedar al final del orden, dibuja al final de la ronda en curso.                                      |
+| Todos acertaron                         | Cuentan solo los conectados, con al menos un acierto. Se revisa también cuando se va un adivinador.                              |
+| El anfitrión se va                      | El rol se transfiere al borrarse el jugador, no al desconectarse.                                                                |
+| Quien ya acertó escribe la palabra      | Se permite; solo lo ven quienes ya la conocen.                                                                                   |
+| Empate                                  | Comparten puesto.                                                                                                                |
+| Misma sesión en otra pestaña            | Gana la última; el `disconnect` del socket viejo se ignora por `connId`.                                                         |
+| Gracia vencida                          | Se borra. Si vuelve, entra como jugador nuevo.                                                                                   |
+| GAME_END                                | No tiene plazo. Sale con `start` del anfitrión, que lleva a LOBBY. Si el anfitrión se va, el rol se transfiere como siempre.     |
+| Chat en CHOOSING                        | Chat normal para todos, incluido el dibujante.                                                                                   |
+| Quién dibuja primero                    | Orden de llegada, sin azar.                                                                                                      |
 
 ## 9. Lo que el motor entrega a la red
 
