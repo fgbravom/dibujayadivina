@@ -5,7 +5,7 @@
 //   HOST           interfaz de escucha (por defecto todas)
 //   WEB_DIR        carpeta del cliente compilado (por defecto apps/web/dist, si existe)
 //   DYA_MAX_ROOMS  tope de salas simultáneas (por defecto 500)
-//   CLIENT_IP_HEADER  cabecera con la IP real del cliente detrás de un proxy (p. ej. fly-client-ip);
+//   CLIENT_IP_HEADER  cabecera con la IP real del cliente detrás de un proxy (p. ej. x-real-ip);
 //                  sin ella no se confía en ninguna cabecera y se usa la IP de la conexión
 //   ALLOWED_ORIGINS  orígenes permitidos además del propio host, separados por coma (solo con
 //                  NODE_ENV=production, que rechaza los Origin que no coinciden con el Host)

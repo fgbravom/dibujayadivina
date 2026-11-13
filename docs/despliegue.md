@@ -5,7 +5,7 @@ Un solo contenedor Node sirve el cliente compilado, Socket.IO y `GET /health`. E
 ## Requisitos
 
 - Docker (para construir la imagen; la plataforma también puede construirla por ti).
-- Una cuenta en la plataforma elegida. Fly.io además necesita `flyctl`.
+- Una cuenta en la plataforma elegida.
 - La plataforma debe permitir WebSockets persistentes, HTTPS y **una sola instancia**: el estado de las partidas vive en la memoria del proceso.
 
 ## Construir y correr en local
@@ -17,50 +17,41 @@ docker run --rm -p 8080:8080 --name dya dibujayadivina
 
 Abre <http://localhost:8080>. Comprobaciones rápidas: `curl localhost:8080/health` devuelve `{"ok":true}` y `localhost:8080/sala/ABCD` devuelve el HTML del cliente. Para detenerlo, `Ctrl+C` (o `docker stop dya` si lo corriste con `-d`).
 
-## Fly.io
+## Railway
 
-La app se llama `dibujayadivina` (<https://dibujayadivina.fly.dev>). Si el nombre se cambia, hay que cambiarlo en `fly.toml`.
+El juego corre en Railway: <https://dibujayadivina-production.up.railway.app>.
 
 ### Primer despliegue (una vez, a mano)
 
-1. Instala `flyctl` (en Windows: `winget install Fly-io.flyctl`) e inicia sesión: `fly auth login`.
-   En Windows winget solo instala `flyctl` (no `fly`), y las terminales de VS Code no ven el PATH nuevo hasta reiniciar VS Code. Para seguir sin reiniciar: `$env:Path += ";$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Fly-io.flyctl_Microsoft.Winget.Source_8wekyb3d8bbwe"; Set-Alias fly flyctl`.
-2. Región: el archivo usa `gru` (São Paulo), porque Santiago (`scl`) no aparece en `fly platform regions`.
-3. Registra la app sin desplegar: `fly apps create dibujayadivina --org personal`.
-4. Despliega con una sola máquina: `fly deploy --ha=false`. Sin esa bandera Fly crea dos máquinas y las salas quedarían repartidas.
-5. Verifica: `fly status` debe mostrar una máquina y el chequeo en `passing`; abre <https://dibujayadivina.fly.dev>.
+1. En Railway: _New Project → Deploy from GitHub repo_ y elige este repositorio. Railway detecta el `Dockerfile` y construye la imagen.
+2. En los ajustes del **servicio** (no del proyecto), _Networking → Generate Domain_ con el puerto `8080`.
+3. En _Deploy_: una sola réplica, _Healthcheck Path_ `/health` y _Serverless_ activado.
 
-### Despliegue continuo con GitHub Actions
+Serverless duerme el servicio cuando no hay tráfico y solo cobra el tiempo despierto; así el uso cabe en el crédito del plan gratis. A cambio se pierden las salas vacías y el primer visitante espera unos segundos el arranque. Siempre encendido, el proceso gasta más o menos el crédito mensual completo solo en memoria.
 
-`.github/workflows/fly-deploy.yml` corre formato, lint, typecheck y pruebas en cada push a `main` y, si pasan, despliega con `flyctl deploy --remote-only --ha=false` (la imagen se construye en Fly, no en GitHub). También se puede lanzar a mano desde la pestaña Actions.
+### Despliegue continuo
 
-Para activarlo, crea un token de despliegue limitado a esta app y guárdalo como secreto del repositorio:
-
-```sh
-fly tokens create deploy -x 999999h
-```
-
-En GitHub: _Settings → Secrets and variables → Actions → New repository secret_, con nombre `FLY_API_TOKEN` y el token completo (incluido el prefijo `FlyV1`) como valor. Sin el secreto, el paso de despliegue falla.
+Railway redespliega solo con cada push a `main`. `.github/workflows/ci.yml` corre formato, lint, typecheck y pruebas en paralelo, pero no frena el despliegue: para que Railway espere a que pasen, activa _Wait for CI_ en los ajustes del servicio.
 
 Ojo: como cada push a `main` despliega, también corta las partidas en curso (ver la advertencia al final).
 
-Compromiso de costo: `fly.toml` usa `auto_stop_machines = "off"`, por lo que la máquina queda encendida siempre y no pierde salas. Con `"stop"` Fly la apaga sin tráfico (más barato) a costa de perder las salas vacías y de un arranque en frío para el primer visitante.
-
-## Railway o Render
+## Render u otra plataforma
 
 Sirven igual: crea un servicio web desde este repositorio con el `Dockerfile`, una única instancia, y deja que la plataforma inyecte `PORT` (la imagen ya escucha en `0.0.0.0`); apunta el chequeo de salud a `/health`.
 
+Fly.io se descartó: sin tarjeta registrada, la cuenta de prueba apaga la máquina cada 5 minutos y con ella las salas.
+
 ## Variables de entorno
 
-| Variable           | Por defecto en la imagen | Uso                                                                                                                                                                                                                                              |
-| ------------------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `PORT`             | `8080`                   | Puerto de escucha. Debe coincidir con `internal_port` de `fly.toml`.                                                                                                                                                                             |
-| `HOST`             | `0.0.0.0`                | Interfaz de escucha.                                                                                                                                                                                                                             |
-| `WEB_DIR`          | `/app/web`               | Carpeta del cliente compilado.                                                                                                                                                                                                                   |
-| `NODE_ENV`         | `production`             | Con `production` el servidor rechaza las conexiones Socket.IO cuyo `Origin` no coincide con el `Host` (ver `ALLOWED_ORIGINS`). Fuera de producción no filtra.                                                                                    |
-| `DYA_MAX_ROOMS`    | `500` (del servidor)     | Tope de salas simultáneas; opcional.                                                                                                                                                                                                             |
-| `CLIENT_IP_HEADER` | (sin definir)            | Cabecera con la IP real del cliente cuando hay un proxy delante. Con ella el servidor cuenta conexiones y salas por IP; sin ella no confía en ninguna cabecera y usa la IP de la conexión. **En Fly conviene `CLIENT_IP_HEADER=fly-client-ip`.** |
-| `ALLOWED_ORIGINS`  | (sin definir)            | Orígenes completos permitidos además del propio host, separados por comas (p. ej. `https://juego.example.com,https://www.juego.example.com`). Solo aplica con `NODE_ENV=production`. Las conexiones sin `Origin` siempre se aceptan.             |
+| Variable           | Por defecto en la imagen | Uso                                                                                                                                                                                                                                                                                                                  |
+| ------------------ | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`             | `8080`                   | Puerto de escucha. Debe coincidir con el puerto del dominio en Railway.                                                                                                                                                                                                                                              |
+| `HOST`             | `0.0.0.0`                | Interfaz de escucha.                                                                                                                                                                                                                                                                                                 |
+| `WEB_DIR`          | `/app/web`               | Carpeta del cliente compilado.                                                                                                                                                                                                                                                                                       |
+| `NODE_ENV`         | `production`             | Con `production` el servidor rechaza las conexiones Socket.IO cuyo `Origin` no coincide con el `Host` (ver `ALLOWED_ORIGINS`). Fuera de producción no filtra.                                                                                                                                                        |
+| `DYA_MAX_ROOMS`    | `500` (del servidor)     | Tope de salas simultáneas; opcional.                                                                                                                                                                                                                                                                                 |
+| `CLIENT_IP_HEADER` | (sin definir)            | Cabecera con la IP real del cliente cuando hay un proxy delante. Con ella el servidor cuenta conexiones y salas por IP; sin ella no confía en ninguna cabecera y usa la IP de la conexión. En Railway la IP real llega en `x-real-ip`; no está definida hoy, así que todos los jugadores comparten los topes por IP. |
+| `ALLOWED_ORIGINS`  | (sin definir)            | Orígenes completos permitidos además del propio host, separados por comas (p. ej. `https://juego.example.com,https://www.juego.example.com`). Solo aplica con `NODE_ENV=production`. Las conexiones sin `Origin` siempre se aceptan.                                                                                 |
 
 Topes de abuso del servidor (no configurables por entorno): por IP, 40 conexiones simultáneas y 10 salas creadas por minuto (`room:create` responde `rate_limited`); una sala en LOBBY o GAME_END sin acciones de jugadores durante 30 minutos se cierra y avisa a sus sockets con `room_not_found`. Si el servidor está detrás de un proxy y no se define `CLIENT_IP_HEADER`, todos los visitantes parecen venir de la misma IP y comparten esos topes.
 
@@ -68,4 +59,4 @@ Las variables `DYA_*` de modo de pruebas (`DYA_TEST`, `DYA_DRAW_MS`, etc.) no de
 
 ## Advertencia: los redespliegues cortan las partidas
 
-Todo el estado está en memoria. Cada `fly deploy`, reinicio o cambio de configuración reinicia el proceso y se pierden las salas en curso: los jugadores verán que la sala ya no existe. Despliega cuando no haya partidas activas.
+Todo el estado está en memoria. Cada despliegue, reinicio o cambio de configuración reinicia el proceso y se pierden las salas en curso: los jugadores verán que la sala ya no existe. Despliega cuando no haya partidas activas.

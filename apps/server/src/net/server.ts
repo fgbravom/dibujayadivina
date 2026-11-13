@@ -63,7 +63,7 @@ export interface GameServerOptions {
   maxRoomsPerIpPerMinute?: number;
   /**
    * Cabecera con la IP real del cliente cuando el servidor está detrás de un proxy de confianza
-   * (p. ej. `fly-client-ip`). Sin ella no se confía en ninguna cabecera y se usa la IP de la conexión.
+   * (p. ej. `x-real-ip`). Sin ella no se confía en ninguna cabecera y se usa la IP de la conexión.
    */
   clientIpHeader?: string | null;
   /**
