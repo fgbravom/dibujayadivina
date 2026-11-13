@@ -18,6 +18,7 @@ import { MessageFeed } from '../components/MessageFeed';
 import { PlayerList } from '../components/PlayerList';
 import { ReconnectBanner } from '../components/ReconnectBanner';
 import { ShareButton } from '../components/ShareButton';
+import { SoundToggle } from '../components/SoundToggle';
 import { Stepper } from '../components/Stepper';
 import { formatClock } from '../lib/clock';
 import { getComposerMode } from '../lib/composer';
@@ -86,15 +87,18 @@ export function LobbyScreen({
                 {room.code}
               </p>
             </div>
-            <Button
-              variant="ghost"
-              onClick={onLeave}
-              aria-label="Salir de la sala"
-              className="-mr-2 shrink-0"
-            >
-              <LogoutIcon />
-              Salir
-            </Button>
+            <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center">
+              <Button
+                variant="ghost"
+                onClick={onLeave}
+                aria-label="Salir de la sala"
+                className="-mr-2 shrink-0"
+              >
+                <LogoutIcon />
+                Salir
+              </Button>
+              <SoundToggle className="shadow-pop-sm" />
+            </div>
           </header>
 
           <section

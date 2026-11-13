@@ -3,6 +3,7 @@ import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { LogoutIcon, StarIcon } from '../components/icons';
 import { ReconnectBanner } from '../components/ReconnectBanner';
+import { SoundToggle } from '../components/SoundToggle';
 import { buildPodium, type PodiumPlace } from '../lib/ranking';
 
 export type GameEndScreenProps = {
@@ -153,10 +154,13 @@ export function GameEndScreen({
               Esperando a que {hostName ?? 'el anfitrión'} arme otra partida…
             </p>
           )}
-          <Button variant="secondary" onClick={onLeave}>
-            <LogoutIcon />
-            Salir de la sala
-          </Button>
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={onLeave} className="flex-1">
+              <LogoutIcon />
+              Salir de la sala
+            </Button>
+            <SoundToggle className="shadow-pop" />
+          </div>
         </div>
       </main>
     </div>

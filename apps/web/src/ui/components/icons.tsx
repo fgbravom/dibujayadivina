@@ -102,3 +102,17 @@ export const StarIcon = (p: IconProps) => (
     <path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9L3.5 9.7l5.9-.8z" />
   </Icon>
 );
+
+export const SpeakerIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
+    <path d="M15.5 9a4.5 4.5 0 010 6M18 6.5a8 8 0 010 11" />
+  </Icon>
+);
+
+export const SpeakerOffIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
+    <path d="M16 9.5l5 5M21 9.5l-5 5" />
+  </Icon>
+);

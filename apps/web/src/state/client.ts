@@ -13,6 +13,7 @@ import {
   type StrokeStartPayload,
 } from '@dya/shared';
 import { io, type Socket } from 'socket.io-client';
+import { playSound, soundForEvent } from '../sound';
 import { roomSharePath } from '../ui/lib/share';
 import { canvasBridge, canvasCommandFor } from './canvasBridge';
 import {
@@ -27,6 +28,7 @@ import {
 } from './identity';
 import { parseRoomPath } from './route';
 import { initialSession, reduceSession, type ServerEvent } from './session';
+import { startSoundDriver } from './soundDriver';
 import { useGameStore } from './store';
 
 type DyaSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -77,6 +79,9 @@ function handleServerEvent(event: ServerEvent): void {
   }
 
   const { session, roomError } = useGameStore.getState();
+  // El efecto se decide con la foto previa al evento; `room:state` (entrar o reconectar) no suena.
+  const sound = soundForEvent(session.room, event);
+  if (sound) playSound(sound);
   const next = reduceSession(session, event, Date.now());
   if (next === session) return;
   const phaseChanged = next.room?.phase !== session.room?.phase;
@@ -278,6 +283,7 @@ export function initClient(): void {
   }
 
   connectSocket();
+  startSoundDriver();
   window.addEventListener('popstate', onPopState);
 }
 

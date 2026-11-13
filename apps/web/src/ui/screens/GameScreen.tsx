@@ -7,6 +7,7 @@ import { MessageComposer } from '../components/MessageComposer';
 import { MessageFeed } from '../components/MessageFeed';
 import { PlayerList } from '../components/PlayerList';
 import { ReconnectBanner } from '../components/ReconnectBanner';
+import { SoundToggle } from '../components/SoundToggle';
 import { TurnEndPanel } from '../components/TurnEndPanel';
 import { WordDisplay } from '../components/WordDisplay';
 import { useCountdown } from '../hooks/useCountdown';
@@ -252,16 +253,19 @@ export function GameScreen({
               variant="chips"
               className="min-w-0 flex-1"
             />
-            {onLeave && (
-              <button
-                type="button"
-                onClick={onLeave}
-                aria-label="Salir de la sala"
-                className="mr-2 inline-flex size-11 shrink-0 items-center justify-center rounded-xl border-2 border-ink bg-card"
-              >
-                <LogoutIcon />
-              </button>
-            )}
+            <div className="mr-2 flex shrink-0 items-center gap-1">
+              <SoundToggle />
+              {onLeave && (
+                <button
+                  type="button"
+                  onClick={onLeave}
+                  aria-label="Salir de la sala"
+                  className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border-2 border-ink bg-card"
+                >
+                  <LogoutIcon />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -277,15 +281,18 @@ export function GameScreen({
               variant="column"
             />
           </div>
-          {onLeave && (
-            <button
-              type="button"
-              onClick={onLeave}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 border-ink bg-card px-4 font-extrabold shadow-pop-sm hover:bg-sol-soft"
-            >
-              <LogoutIcon /> Salir de la sala
-            </button>
-          )}
+          <div className="flex gap-2">
+            {onLeave && (
+              <button
+                type="button"
+                onClick={onLeave}
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border-2 border-ink bg-card px-4 font-extrabold shadow-pop-sm hover:bg-sol-soft"
+              >
+                <LogoutIcon /> Salir de la sala
+              </button>
+            )}
+            <SoundToggle className="shadow-pop-sm hover:bg-sol-soft" />
+          </div>
         </aside>
 
         {/* Centro: lienzo y herramientas (en apaisado, la barra queda a la izquierda del lienzo). */}
