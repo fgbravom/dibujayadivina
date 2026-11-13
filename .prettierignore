@@ -1,0 +1,5 @@
+node_modules
+dist
+pnpm-lock.yaml
+PLAN.md
+apps/server/src/words/words.json
