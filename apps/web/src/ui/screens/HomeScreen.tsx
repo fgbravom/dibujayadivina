@@ -243,6 +243,16 @@ export function HomeScreen({
         <p className="text-center text-sm font-bold text-ink-soft">
           Sin registro: eliges un apodo, compartes el código y a dibujar.
         </p>
+
+        <a
+          href="https://bachillerato-production.up.railway.app"
+          target="_blank"
+          rel="noopener"
+          data-testid="sibling-game-link"
+          className="mx-auto inline-flex items-center gap-1.5 rounded-full border-2 border-ink bg-card px-4 py-1.5 text-sm font-extrabold text-ink shadow-pop-sm"
+        >
+          📝 Juega también Bachillerato
+        </a>
       </main>
     </div>
   );
