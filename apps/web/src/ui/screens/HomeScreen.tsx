@@ -117,9 +117,7 @@ export function HomeScreen({
                 className="size-2.5 rounded-full border border-ink bg-pasto"
               />
               <span className="tabular-nums">
-                {onlineCount === 1
-                  ? '1 jugador online'
-                  : `${onlineCount} jugadores online`}
+                {onlineCount === 1 ? '1 jugador online' : `${onlineCount} jugadores online`}
               </span>
             </div>
           )}
