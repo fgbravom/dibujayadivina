@@ -103,7 +103,7 @@ export function HomeScreen({
   return (
     <div className="safe-pad flex min-h-(--app-h) flex-col">
       <ReconnectBanner connected={connected} />
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 px-4 py-8">
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-5 px-4 pt-5 pb-24">
         <div className="flex flex-col items-center gap-3">
           <Logo />
           {connected && onlineCount !== null && onlineCount > 0 && (
